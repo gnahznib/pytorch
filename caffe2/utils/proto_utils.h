@@ -9,7 +9,7 @@
 
 #include "caffe2/core/logging.h"
 #include "caffe2/utils/proto_wrap.h"
-#include "caffe2/proto/caffe2.pb.h"
+#include "caffe2/proto/caffe2_pb.h"
 
 namespace caffe2 {
 
@@ -29,6 +29,9 @@ CAFFE2_API int DeviceId(const DeviceOption& option);
 
 // Returns if the two DeviceOptions are pointing to the same device.
 CAFFE2_API bool IsSameDevice(const DeviceOption& lhs, const DeviceOption& rhs);
+
+CAFFE2_API bool IsCPUDeviceType(int device_type);
+CAFFE2_API bool IsGPUDeviceType(int device_type);
 
 // Common interfaces that reads file contents into a string.
 CAFFE2_API bool ReadStringFromFile(const char* filename, string* str);
@@ -52,6 +55,7 @@ namespace TextFormat {
 inline bool ParseFromString(const string& spec, MessageLite* proto) {
   LOG(FATAL) << "If you are running lite version, you should not be "
              << "calling any text-format protobuffers.";
+  return false;
 }
 } // namespace TextFormat
 
@@ -194,7 +198,7 @@ CAFFE2_API bool HasInput(const OperatorDef& op, const std::string& input);
  * does not copy the operator def, so one would need to make sure that the
  * lifetime of the OperatorDef object outlives that of the ArgumentHelper.
  */
-class CAFFE2_API ArgumentHelper {
+class C10_EXPORT ArgumentHelper {
  public:
   template <typename Def>
   static bool HasArgument(const Def& def, const string& name) {
@@ -326,6 +330,14 @@ bool inline operator==(const DeviceOption& dl, const DeviceOption& dr) {
   return IsSameDevice(dl, dr);
 }
 
+// Given a net, modify the external inputs/outputs if necessary so that
+// the following conditions are met
+// - No duplicate external inputs
+// - No duplicate external outputs
+// - Going through list of ops in order, all op inputs must be outputs
+// from other ops, or registered as external inputs.
+// - All external outputs must be outputs of some operators.
+CAFFE2_API void cleanupExternalInputsAndOutputs(NetDef* net);
 
 } // namespace caffe2
 

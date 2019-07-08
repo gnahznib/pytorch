@@ -308,6 +308,11 @@ Non-linear activations (weighted sum, nonlinearity)
 .. autoclass:: LogSigmoid
     :members:
 
+:hidden:`MultiheadAttention`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. autoclass:: MultiheadAttention
+    :members:
+
 :hidden:`PReLU`
 ~~~~~~~~~~~~~~~
 
@@ -446,6 +451,12 @@ Normalization layers
 .. autoclass:: GroupNorm
     :members:
 
+:hidden:`SyncBatchNorm`
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: SyncBatchNorm
+    :members:
+
 :hidden:`InstanceNorm1d`
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -517,6 +528,12 @@ Recurrent layers
 
 Linear layers
 ----------------------------------
+
+:hidden:`Identity`
+~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: Identity
+    :members:
 
 :hidden:`Linear`
 ~~~~~~~~~~~~~~~~
@@ -742,6 +759,12 @@ DataParallel layers (multi-GPU, distributed)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: torch.nn.parallel.DistributedDataParallel
+    :members:
+
+:hidden:`DistributedDataParallelCPU`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: torch.nn.parallel.DistributedDataParallelCPU
     :members:
 
 
@@ -1160,6 +1183,11 @@ Sparse functions
 
 .. autofunction:: embedding_bag
 
+:hidden:`one_hot`
+~~~~~~~~~~~~~~~~~
+
+.. autofunction:: one_hot
+
 Distance functions
 ----------------------------------
 
@@ -1172,6 +1200,11 @@ Distance functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. autofunction:: cosine_similarity
+
+:hidden:`pdist`
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: pdist
 
 
 Loss functions
