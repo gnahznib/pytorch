@@ -1,15 +1,18 @@
 #pragma once
 
-#include "torch/csrc/python_headers.h"
+#include <torch/csrc/python_headers.h>
+#include <torch/csrc/WindowsTorchApiMacro.h>
 
 #include <ATen/Device.h>
 
-struct THPDevice {
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+struct TORCH_API THPDevice {
   PyObject_HEAD
   at::Device device;
 };
 
-extern PyTypeObject THPDeviceType;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+TORCH_API extern PyTypeObject THPDeviceType;
 
 inline bool THPDevice_Check(PyObject *obj) {
   return Py_TYPE(obj) == &THPDeviceType;

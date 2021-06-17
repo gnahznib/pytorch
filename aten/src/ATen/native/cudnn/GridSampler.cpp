@@ -11,13 +11,13 @@ namespace at { namespace native {
 
 Tensor cudnn_grid_sampler_forward(
     const Tensor& input_t, const Tensor& grid_t) {
-  throw std::runtime_error("cudnn_grid_sampler_forward: ATen not compiled with cuDNN support");
+  AT_ERROR("cudnn_grid_sampler_forward: ATen not compiled with cuDNN support");
 }
 
 std::tuple<Tensor, Tensor> cudnn_grid_sampler_backward(
     const Tensor& input_t, const Tensor& grid_t,
     const Tensor& grad_output_t) {
-  throw std::runtime_error("cudnn_grid_sampler_backward: ATen not compiled with cuDNN support");
+  AT_ERROR("cudnn_grid_sampler_backward: ATen not compiled with cuDNN support");
 }
 
 }}
@@ -66,16 +66,17 @@ void checkGridSize(CheckedFrom c, TensorArg grid, TensorArg input)
 Tensor cudnn_grid_sampler_forward(
     const Tensor& input_t, const Tensor& grid_t)
 {
-  TensorArg input{ contiguousIfZeroInStrides(input_t), "input", 1 },
-            grid{ grid_t.contiguous(), "grid", 2 };
+  auto input_contig = contiguousIfZeroInStrides(input_t);
+  auto grid_contig = grid_t.contiguous();
+  TensorArg input{ input_contig, "input", 1 },
+            grid{ grid_contig, "grid", 2 };
   CheckedFrom c = "cudnn_grid_sampler_forward";
-  setCuDNNStreamToCurrent();
   checkAllSameGPU(c, {input, grid});
   checkAllSameType(c, {input, grid});
   checkGridSize(c, grid, input);
   checkDim(c, input, 4);
 
-  auto output_t = input->type().tensor();
+  auto output_t = at::empty({0}, input->options());
   output_t.resize_({input->size(0), input->size(1), grid->size(1), grid->size(2)});
 
   TensorDescriptor idesc{ *input };  // input descriptor
@@ -104,19 +105,21 @@ std::tuple<Tensor, Tensor> cudnn_grid_sampler_backward(
     const Tensor& input_t, const Tensor& grid_t,
     const Tensor& grad_output_t)
 {
-  TensorArg input{ contiguousIfZeroInStrides(input_t), "input", 1 },
-            grid{ grid_t.contiguous(), "grid", 2 },
-            grad_output{ contiguousIfZeroInStrides(grad_output_t), "grad_output", 3 };
+  auto input_contig = contiguousIfZeroInStrides(input_t);
+  auto grid_contig = grid_t.contiguous();
+  auto grad_output_contig = contiguousIfZeroInStrides(grad_output_t);
+  TensorArg input{ input_contig, "input", 1 },
+            grid{ grid_contig, "grid", 2 },
+            grad_output{ grad_output_contig, "grad_output", 3 };
   CheckedFrom c = "cudnn_grid_sampler_backward";
-  setCuDNNStreamToCurrent();
   checkAllSameGPU(c, {input, grad_output, grid});
   checkGridSize(c, grid, input);
   checkDim(c, input, 4);
   checkDim(c, grad_output, 4);
 
-  auto grad_input_t = input->type().tensor();
+  auto grad_input_t = at::empty({0}, input->options());
   grad_input_t.resize_(input->sizes());
-  auto grad_grid_t = grid->type().tensor();
+  auto grad_grid_t = at::empty({0}, grid->options());
   grad_grid_t.resize_(grid->sizes());
 
   TensorDescriptor idesc{ *input };  // input descriptor

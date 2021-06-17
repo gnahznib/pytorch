@@ -2,6 +2,13 @@
 #define THC_DEVICE_UTILS_INC
 
 #include <cuda.h>
+
+#ifdef __HIP_PLATFORM_HCC__
+#include <c10/util/Half.h>
+#endif
+
+#include <c10/util/BFloat16.h>
+
 /* The largest consecutive integer representable in float32 (2^24) */
 #define FLOAT32_MAX_CONSECUTIVE_INT 16777216.0f
 
@@ -27,86 +34,13 @@ __host__ __device__ __forceinline__ T THCRoundUp(T a, T b) {
  */
 template <typename T>
 __device__ __forceinline__ T doLdg(const T* p) {
-#if __CUDA_ARCH__ >= 350
+#if __CUDA_ARCH__ >= 350 && !defined __HIP_PLATFORM_HCC__
   return __ldg(p);
 #else
   return *p;
 #endif
 }
 
-__device__ __forceinline__ unsigned int ACTIVE_MASK()
-{
-#if CUDA_VERSION >= 9000
-    return __activemask();
-#else
-// will be ignored anyway
-    return 0xffffffff;
-#endif
-}
-
-__device__ __forceinline__ unsigned int WARP_BALLOT(int predicate, unsigned int mask = 0xffffffff)
-{
-#if CUDA_VERSION >= 9000
-    return __ballot_sync(mask, predicate);
-#else
-    return __ballot(predicate);
-#endif
-}
-
-#ifdef __HIP_PLATFORM_HCC__
-//To handle ambiguity, add a type double version.
-__device__ __forceinline__ double WARP_SHFL_XOR(double value, int laneMask, int width = warpSize, unsigned int mask = 0xffffffff) {
-  //(HIP doesn't support double)
-  return (double) __shfl_xor((float) value, laneMask, width);
-}
-#endif
-template <typename T>
-__device__ __forceinline__ T WARP_SHFL_XOR(T value, int laneMask, int width = warpSize, unsigned int mask = 0xffffffff)
-{
-#if CUDA_VERSION >= 9000
-    return __shfl_xor_sync(mask, value, laneMask, width);
-#else
-    return __shfl_xor(value, laneMask, width);
-#endif
-}
-
-template <typename T>
-__device__ __forceinline__ T WARP_SHFL(T value, int srcLane, int width = warpSize, unsigned int mask = 0xffffffff)
-{
-#if CUDA_VERSION >= 9000
-    return __shfl_sync(mask, value, srcLane, width);
-#else
-    return __shfl(value, srcLane, width);
-#endif
-}
-
-template <typename T>
-__device__ __forceinline__ T WARP_SHFL_UP(T value, unsigned int delta, int width = warpSize, unsigned int mask = 0xffffffff)
-{
-#if CUDA_VERSION >= 9000
-    return __shfl_up_sync(mask, value, delta, width);
-#else
-    return __shfl_up(value, delta, width);
-#endif
-}
-
-#ifdef __HIP_PLATFORM_HCC__
-//To handle ambiguity, add a type double version.
-__device__ __forceinline__ double WARP_SHFL_DOWN(double value, unsigned int delta, int width = warpSize, unsigned int mask = 0xffffffff)
-{
-  //(HIP doesn't support double)
-  return (double) __shfl_down((float) value, delta, width);
-}
-#endif
-template <typename T>
-__device__ __forceinline__ T WARP_SHFL_DOWN(T value, unsigned int delta, int width = warpSize, unsigned int mask = 0xffffffff)
-{
-#if CUDA_VERSION >= 9000
-    return __shfl_down_sync(mask, value, delta, width);
-#else
-    return __shfl_down(value, delta, width);
-#endif
-}
-
+#include <ATen/cuda/DeviceUtils.cuh>
 
 #endif // THC_DEVICE_UTILS_INC

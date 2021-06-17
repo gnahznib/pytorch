@@ -1,7 +1,7 @@
 #include <TH/THGeneral.h>
 
-#ifdef _OPENMP
-#include <omp.h>
+#ifdef __cplusplus
+#include <c10/core/CPUAllocator.h>
 #endif
 
 #ifndef TH_HAVE_THREAD
@@ -20,27 +20,24 @@
 #include <malloc/malloc.h>
 #endif
 
-#ifdef TH_BLAS_MKL
-// this is the C prototype, while mkl_set_num_threads is the fortran prototype
-TH_EXTERNC void MKL_Set_Num_Threads(int);
-// this is the C prototype, while mkl_get_max_threads is the fortran prototype
-TH_EXTERNC int  MKL_Get_Max_Threads(void);
-#endif
-
 /* Torch Error Handling */
 static void defaultErrorHandlerFunction(const char *msg, void *data)
 {
-  printf("$ Error: %s\n", msg);
-  exit(-1);
+  throw std::runtime_error(msg);
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static THErrorHandlerFunction defaultErrorHandler = defaultErrorHandlerFunction;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static void *defaultErrorHandlerData;
+// NOLINTNEXTLINE(modernize-use-nullptr,cppcoreguidelines-avoid-non-const-global-variables)
 static __thread THErrorHandlerFunction threadErrorHandler = NULL;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static __thread void *threadErrorHandlerData;
 
 void _THError(const char *file, const int line, const char *fmt, ...)
 {
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,cppcoreguidelines-avoid-magic-numbers)
   char msg[2048];
   va_list args;
 
@@ -62,6 +59,7 @@ void _THError(const char *file, const int line, const char *fmt, ...)
 }
 
 void _THAssertionFailed(const char *file, const int line, const char *exp, const char *fmt, ...) {
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,cppcoreguidelines-avoid-magic-numbers)
   char msg[1024];
   va_list args;
   va_start(args, fmt);
@@ -88,21 +86,24 @@ void THSetDefaultErrorHandler(THErrorHandlerFunction new_handler, void *data)
 /* Torch Arg Checking Handling */
 static void defaultArgErrorHandlerFunction(int argNumber, const char *msg, void *data)
 {
-  if(msg)
-    printf("$ Invalid argument %d: %s\n", argNumber, msg);
-  else
-    printf("$ Invalid argument %d\n", argNumber);
-  exit(-1);
+  std::stringstream new_error;
+  new_error << "invalid argument " << argNumber << ": " << msg;
+  throw std::runtime_error(new_error.str());
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static THArgErrorHandlerFunction defaultArgErrorHandler = defaultArgErrorHandlerFunction;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static void *defaultArgErrorHandlerData;
+// NOLINTNEXTLINE(modernize-use-nullptr,cppcoreguidelines-avoid-non-const-global-variables)
 static __thread THArgErrorHandlerFunction threadArgErrorHandler = NULL;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static __thread void *threadArgErrorHandlerData;
 
 void _THArgCheck(const char *file, int line, int condition, int argNumber, const char *fmt, ...)
 {
   if(!condition) {
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,cppcoreguidelines-avoid-magic-numbers)
     char msg[2048];
     va_list args;
 
@@ -139,7 +140,9 @@ void THSetDefaultArgErrorHandler(THArgErrorHandlerFunction new_handler, void *da
   defaultArgErrorHandlerData = data;
 }
 
+// NOLINTNEXTLINE(modernize-use-nullptr,cppcoreguidelines-avoid-non-const-global-variables)
 static __thread void (*torchGCFunction)(void *data) = NULL;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static __thread void *torchGCData;
 
 /* Optional hook for integrating with a garbage-collected frontend.
@@ -158,52 +161,12 @@ void THSetGCHandler( void (*torchGCFunction_)(void *data), void *data )
   torchGCData = data;
 }
 
-static void* THAllocInternal(ptrdiff_t size)
-{
-  void *ptr;
-
-  if (size > 5120)
-  {
-#if (defined(__unix) || defined(__APPLE__)) && (!defined(DISABLE_POSIX_MEMALIGN))
-    if (posix_memalign(&ptr, 64, size) != 0)
-      ptr = NULL;
-/*
-#elif defined(_WIN32)
-    ptr = _aligned_malloc(size, 64);
-*/
-#else
-    ptr = malloc(size);
-#endif
-  }
-  else
-  {
-    ptr = malloc(size);
-  }
-
-  return ptr;
-}
-
 void* THAlloc(ptrdiff_t size)
 {
-  void *ptr;
-
   if(size < 0)
     THError("$ Torch: invalid memory size -- maybe an overflow?");
 
-  if(size == 0)
-    return NULL;
-
-  ptr = THAllocInternal(size);
-
-  if(!ptr && torchGCFunction) {
-    torchGCFunction(torchGCData);
-    ptr = THAllocInternal(size);
-  }
-
-  if(!ptr)
-    THError("$ Torch: not enough memory: you tried to allocate %dGB. Buy new RAM!", size/1073741824);
-
-  return ptr;
+  return c10::alloc_cpu(size);
 }
 
 void* THRealloc(void *ptr, ptrdiff_t size)
@@ -214,16 +177,19 @@ void* THRealloc(void *ptr, ptrdiff_t size)
   if(size == 0)
   {
     THFree(ptr);
+    // NOLINTNEXTLINE(modernize-use-nullptr)
     return NULL;
   }
 
   if(size < 0)
     THError("$ Torch: invalid memory size -- maybe an overflow?");
 
+  // NOLINTNEXTLINE(cppcoreguidelines-no-malloc)
   void *newptr = realloc(ptr, size);
 
   if(!newptr && torchGCFunction) {
     torchGCFunction(torchGCData);
+    // NOLINTNEXTLINE(cppcoreguidelines-no-malloc)
     newptr = realloc(ptr, size);
   }
 
@@ -235,79 +201,16 @@ void* THRealloc(void *ptr, ptrdiff_t size)
 
 void THFree(void *ptr)
 {
-  free(ptr);
-}
-
-double THLog10(const double x)
-{
-  return log10(x);
-}
-
-double THLog1p(const double x)
-{
-#if (defined(_MSC_VER) || defined(__MINGW32__))
-  volatile double y = 1 + x;
-  return log(y) - ((y-1)-x)/y ;  /* cancels errors with IEEE arithmetic */
-#else
-  return log1p(x);
-#endif
-}
-
-double THLog2(const double x)
-{
-  return log2(x);
-}
-
-double THExpm1(const double x)
-{
-  return expm1(x);
-}
-
-void THSetNumThreads(int num_threads)
-{
-#ifdef _OPENMP
-  omp_set_num_threads(num_threads);
-#endif
-#ifdef TH_BLAS_MKL
-  MKL_Set_Num_Threads(num_threads);
-#endif
-
-}
-
-int THGetNumThreads(void)
-{
-#ifdef _OPENMP
-  return omp_get_max_threads();
-#else
-  return 1;
-#endif
-}
-
-int THGetNumCores(void)
-{
-#ifdef _OPENMP
-  return omp_get_num_procs();
-#else
-  return 1;
-#endif
-}
-
-TH_API void THInferNumThreads(void)
-{
-#if defined(_OPENMP) && defined(TH_BLAS_MKL)
-  // If we are using MKL an OpenMP make sure the number of threads match.
-  // Otherwise, MKL and our OpenMP-enabled functions will keep changing the
-  // size of the OpenMP thread pool, resulting in worse performance (and memory
-  // leaks in GCC 5.4)
-  omp_set_num_threads(MKL_Get_Max_Threads());
-#endif
+  c10::free_cpu(ptr);
 }
 
 THDescBuff _THSizeDesc(const int64_t *size, const int64_t ndim) {
   const int L = TH_DESC_BUFF_LEN;
   THDescBuff buf;
   char *str = buf.str;
-  int i, n = 0;
+  // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+  int64_t i;
+  int64_t n = 0;
   n += snprintf(str, L-n, "[");
 
   for (i = 0; i < ndim; i++) {

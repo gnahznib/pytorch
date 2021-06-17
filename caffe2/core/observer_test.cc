@@ -1,17 +1,17 @@
 #include <gtest/gtest.h>
+#include "c10/util/Registry.h"
 #include "caffe2/core/common.h"
 #include "caffe2/core/net.h"
-#include "caffe2/core/net_dag.h"
 #include "caffe2/core/net_simple.h"
 #include "caffe2/core/observer.h"
 #include "caffe2/core/operator.h"
-#include "caffe2/core/registry.h"
 #include "caffe2/core/scope_guard.h"
 
 namespace caffe2 {
 
 namespace {
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static std::atomic<int> counter;
 
 template <class T>
@@ -21,14 +21,15 @@ class DummyObserver final : public ObserverBase<T> {
   void Start() override;
   void Stop() override;
 
-  ~DummyObserver() {}
+  // NOLINTNEXTLINE(modernize-use-equals-default)
+  ~DummyObserver() override {}
 };
 
 template <>
 void DummyObserver<NetBase>::Start() {
   vector<OperatorBase*> operators = subject_->GetOperators();
   for (auto& op : operators) {
-    op->AttachObserver(caffe2::make_unique<DummyObserver<OperatorBase>>(op));
+    op->AttachObserver(std::make_unique<DummyObserver<OperatorBase>>(op));
   }
   counter.fetch_add(1000);
 }
@@ -58,9 +59,12 @@ class ObsTestDummyOp final : public OperatorBase {
   }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(ObsTestDummy, ObsTestDummyOp);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CUDA_OPERATOR(ObsTestDummy, ObsTestDummyOp);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(ObsTestDummy)
     .NumInputs(0, INT_MAX)
     .NumOutputs(0, INT_MAX)
@@ -90,6 +94,7 @@ unique_ptr<NetBase> CreateNetTestHelper(Workspace* ws, bool isDAG = false) {
 }
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 TEST(ObserverTest, TestNotify) {
   auto count_before = counter.load();
   Workspace ws;
@@ -105,6 +110,7 @@ TEST(ObserverTest, TestNotify) {
   EXPECT_EQ(1212, count_after - count_before);
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 TEST(ObserverTest, TestUniqueMap) {
   auto count_before = counter.load();
   Workspace ws;
@@ -122,6 +128,7 @@ TEST(ObserverTest, TestUniqueMap) {
   EXPECT_EQ(1212, count_after - count_before);
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 TEST(ObserverTest, TestNotifyAfterDetach) {
   auto count_before = counter.load();
   Workspace ws;
@@ -137,6 +144,7 @@ TEST(ObserverTest, TestNotifyAfterDetach) {
   EXPECT_EQ(0, count_after - count_before);
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 TEST(ObserverTest, TestDAGNetBase) {
   auto count_before = counter.load();
   Workspace ws;
@@ -151,6 +159,9 @@ TEST(ObserverTest, TestDAGNetBase) {
   EXPECT_EQ(1212, count_after - count_before);
 }
 
+#if 0
+// This test intermittently segfaults,
+// see https://github.com/pytorch/pytorch/issues/9137
 TEST(ObserverTest, TestMultipleNetBase) {
   Workspace ws;
   ws.CreateBlob("in");
@@ -176,4 +187,5 @@ TEST(ObserverTest, TestMultipleNetBase) {
 
   EXPECT_EQ(net.get()->NumObservers(), prev_num);
 }
+#endif
 } // namespace caffe2

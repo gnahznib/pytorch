@@ -4,7 +4,8 @@
 #include "caffe2/core/logging.h"
 #include "caffe2/utils/cpuid.h"
 
-CAFFE2_DEFINE_bool(
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+C10_DEFINE_bool(
     caffe2_quit_on_unsupported_cpu_feature,
     false,
     "If set, when Caffe2 is built with a CPU feature (like avx2) but the "
@@ -13,7 +14,7 @@ CAFFE2_DEFINE_bool(
 
 namespace caffe2 {
 
-static void QuitIfFeatureUnsupported(
+inline void QuitIfFeatureUnsupported(
     const bool cpu_has_feature, const string& feature) {
   VLOG(1) << "Caffe2 built with " << feature << ".";
   if (!cpu_has_feature) {
@@ -72,6 +73,7 @@ bool Caffe2CheckIntrinsicsFeatures(int*, char***) {
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CAFFE2_INIT_FUNCTION(
     Caffe2CheckIntrinsicsFeatures,
     &Caffe2CheckIntrinsicsFeatures,

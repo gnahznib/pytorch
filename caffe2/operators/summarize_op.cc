@@ -5,7 +5,7 @@ namespace caffe2 {
 template <>
 bool SummarizeOp<float, CPUContext>::RunOnDevice() {
   auto& X = Input(0);
-  const auto N = X.size();
+  const auto N = X.numel();
   CAFFE_ENFORCE_GT(N, 0);
 
   const float* Xdata = X.data<float>();
@@ -25,14 +25,14 @@ bool SummarizeOp<float, CPUContext>::RunOnDevice() {
     standard_deviation += diff * diff;
   }
   // Unbiased or biased? Let's do unbiased now.
+  // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
   standard_deviation = N == 1 ? 0 : std::sqrt(standard_deviation / (N - 1));
   if (to_file_) {
     (*log_file_) << min << " " << max << " " << mean << " "
                  << standard_deviation << std::endl;
   }
   if (OutputSize()) {
-    auto* Y = Output(0);
-    Y->Resize(NUM_STATS);
+    auto* Y = Output(0, {NUM_STATS}, at::dtype<float>());
     float* Ydata = Y->template mutable_data<float>();
     Ydata[MIN_IDX] = min;
     Ydata[MAX_IDX] = max;
@@ -42,10 +42,12 @@ bool SummarizeOp<float, CPUContext>::RunOnDevice() {
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(Summarize, SummarizeOp<float, CPUContext>);
 
 // Input: X; output: if set, a summarized Tensor of shape 4, with the values
 // being min, max, mean and std respectively.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Summarize)
     .NumInputs(1)
     .NumOutputs(0, 1)
@@ -66,5 +68,6 @@ greater than 0, the values are written to a log file in the root folder.
         "1-D tensor (Tensor) of size 4 containing min, "
         "max, mean and standard deviation");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(Summarize);
 } // namespace caffe2

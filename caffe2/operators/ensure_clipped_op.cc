@@ -12,12 +12,12 @@ bool EnsureClippedOp<float, CPUContext>::DoRunWithType() {
   auto* paramOut = Output(OUTPUT_PARAM)->template mutable_data<float>();
   CAFFE_ENFORCE_EQ(paramIn, paramOut);
   // n: number of sparse embeddings to be normalized
-  auto n = Input(INDICES).size();
+  auto n = Input(INDICES).numel();
   if (n == 0) {
     return true;
   }
   // embedding length, e.g. 32, 64, 128
-  auto block_size = Input(GRAD).size() / n;
+  auto block_size = Input(GRAD).numel() / n;
   for (int i = 0; i < n; ++i) {
     auto idx = indices[i];
     auto offsetIdx = idx * block_size;
@@ -29,7 +29,9 @@ bool EnsureClippedOp<float, CPUContext>::DoRunWithType() {
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(EnsureClipped, EnsureClippedOp<float, CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(EnsureClipped)
     .NumInputs(1, 3)
     .NumOutputs(1)
@@ -43,5 +45,6 @@ Given a tensor, apply clip after gradient is applied; when the param is sparse a
 indicated by valid indices and grad, in-place is required
 )DOC");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(EnsureClipped);
 } // namespace caffe2

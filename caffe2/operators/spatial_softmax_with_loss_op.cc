@@ -1,16 +1,18 @@
-#include "spatial_softmax_with_loss_op.h"
-#include "softmax_shared.h"
+#include "caffe2/operators/spatial_softmax_with_loss_op.h"
 
 namespace caffe2 {
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     SpatialSoftmaxWithLoss,
     SpatialSoftmaxWithLossOp<float, CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     SpatialSoftmaxWithLossGradient,
     SpatialSoftmaxWithLossGradientOp<float, CPUContext>);
 
 // Input: X (logits), T (labels); Output: P (probs), Y
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(SpatialSoftmaxWithLoss)
     .NumInputs(2, 3)
     .NumOutputs(2)
@@ -57,6 +59,7 @@ For spatial softmax, weighting is by x,y position of the input.
     .Output(1, "loss", "Average loss");
 
 // Input: X, T, P, dY; Output: dX
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(SpatialSoftmaxWithLossGradient).NumOutputs(1);
 
 #define DONT_CARE (-1)
@@ -65,14 +68,19 @@ template <>
 bool SpatialSoftmaxWithLossOp<float, CPUContext>::RunOnDevice() {
   auto& X = Input(0); // Logits
   auto& T = Input(1); // Labels / targets
-  auto* P = Output(0); // Probabilities from softmax
-  auto* avg_loss = Output(1); // Average loss
+
+  // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
   int N, D;
   N = X.dim32(0);
   D = X.dim32(1);
-  P->ResizeLike(X);
+  auto* P =
+      Output(0, X.sizes(), at::dtype<float>()); // Probabilities from softmax
 
-  if (sum_multiplier_.size() != D) {
+  if (!sum_multiplier_.defined()) {
+    sum_multiplier_ = caffe2::empty({D}, at::dtype<float>().device(CPU));
+    math::Set<float, CPUContext>(
+        D, 1.f, sum_multiplier_.mutable_data<float>(), &context_);
+  } else if (sum_multiplier_.numel() != D) {
     sum_multiplier_.Resize(D);
     math::Set<float, CPUContext>(
         D, 1.f, sum_multiplier_.mutable_data<float>(), &context_);
@@ -80,8 +88,8 @@ bool SpatialSoftmaxWithLossOp<float, CPUContext>::RunOnDevice() {
 
   float* Pdata = P->template mutable_data<float>();
   const float* weights = (InputSize() > 2 ? Input(2).data<float>() : nullptr);
-  CAFFE_ENFORCE_EQ(X.ndim(), 4);
-  CAFFE_ENFORCE_EQ(T.ndim(), 3);
+  CAFFE_ENFORCE_EQ(X.dim(), 4);
+  CAFFE_ENFORCE_EQ(T.dim(), 3);
   CAFFE_ENFORCE_EQ(T.dim32(0), N);
 
   int H = X.dim32(2);
@@ -119,7 +127,8 @@ bool SpatialSoftmaxWithLossOp<float, CPUContext>::RunOnDevice() {
   }
 
   // Compute the avg cross-entropy loss
-  avg_loss->Resize(vector<TIndex>());
+  auto* avg_loss =
+      Output(1, vector<int64_t>(), at::dtype<float>()); // Average loss
   float* avg_loss_data = avg_loss->template mutable_data<float>();
   const int* label_data = T.data<int>();
 
@@ -139,6 +148,7 @@ bool SpatialSoftmaxWithLossOp<float, CPUContext>::RunOnDevice() {
               " vs ",
               D);
           int idx = i * (H * W * D) + label * (H * W) + y * W + x;
+          // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
           float w = weights ? weights[label_idx] : 1.0;
           total_weight += w;
           sum_label_xent += -log(std::max(Pdata[idx], 1e-20f)) * w;
@@ -161,15 +171,16 @@ bool SpatialSoftmaxWithLossGradientOp<float, CPUContext>::RunOnDevice() {
   // Input(2) is weights if given
   auto& P = Input(InputSize() - 2); // Probabilities from softmax
   auto& d_avg_loss = Input(InputSize() - 1); // Gradient w.r.t. avg loss
-  auto* dX = Output(0);
+
   const float* weights = (InputSize() > 4 ? Input(2).data<float>() : nullptr);
+  // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
   int N, D;
   N = X.dim32(0);
   D = X.dim32(1);
-  dX->ResizeLike(X);
+  auto* dX = Output(0, X.sizes(), at::dtype<float>());
   CAFFE_ENFORCE_EQ(T.dim32(0), N);
-  CAFFE_ENFORCE_EQ(X.ndim(), 4);
-  CAFFE_ENFORCE_EQ(T.ndim(), 3);
+  CAFFE_ENFORCE_EQ(X.dim(), 4);
+  CAFFE_ENFORCE_EQ(T.dim(), 3);
 
   int H = X.dim32(2);
   int W = X.dim32(3);
@@ -181,7 +192,7 @@ bool SpatialSoftmaxWithLossGradientOp<float, CPUContext>::RunOnDevice() {
   // Copy softmax probabilities into dX. All but the neuron
   // corresponding to the correct label has gradient equaling e(x_j)
   // which is the probability under softmax.
-  context_.CopyFromCPU<float>(P.size(), Pdata, dX_data);
+  context_.CopyFromCPU<float>(P.numel(), Pdata, dX_data);
 
   float total_weight = 0.0f;
   for (int y = 0; y < H; ++y) {
@@ -193,6 +204,7 @@ bool SpatialSoftmaxWithLossGradientOp<float, CPUContext>::RunOnDevice() {
         if (label != DONT_CARE) {
           int idx = i * (H * W * D) + label * (H * W) + y * W + x;
 
+          // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
           dX_data[idx] = (dX_data[idx] - 1.0);
 
           if (weights != nullptr) {
@@ -218,14 +230,14 @@ bool SpatialSoftmaxWithLossGradientOp<float, CPUContext>::RunOnDevice() {
 
   if (total_weight > 0) {
     math::Scale<float, float, CPUContext>(
-        dX->size(),
+        dX->numel(),
         scale_ / total_weight,
         dX->data<float>(),
         dX_data,
         &context_);
   }
   math::Scale<float, float, CPUContext>(
-      dX->size(),
+      dX->numel(),
       d_avg_loss.data<float>(),
       dX->data<float>(),
       dX->template mutable_data<float>(),
@@ -253,6 +265,7 @@ class GetSoftmaxWithLossGradient : public GradientMakerBase {
   }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(SpatialSoftmaxWithLoss, GetSoftmaxWithLossGradient);
 }
 } // namespace caffe2

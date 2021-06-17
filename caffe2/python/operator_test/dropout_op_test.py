@@ -1,20 +1,21 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
 
-from hypothesis import assume, given
+
+
+
+
+from hypothesis import assume, given, settings
 import hypothesis.strategies as st
 import numpy as np
 
 from caffe2.proto import caffe2_pb2
 from caffe2.python import core
 import caffe2.python.hypothesis_test_util as hu
+import caffe2.python.serialized_test.serialized_test_util as serial
 
 
-class TestDropout(hu.HypothesisTestCase):
+class TestDropout(serial.SerializedTestCase):
 
-    @given(X=hu.tensor(),
+    @serial.given(X=hu.tensor(),
            in_place=st.booleans(),
            ratio=st.floats(0, 0.999),
            engine=st.sampled_from(["", "CUDNN"]),
@@ -47,6 +48,7 @@ class TestDropout(hu.HypothesisTestCase):
            output_mask=st.booleans(),
            engine=st.sampled_from(["", "CUDNN"]),
            **hu.gcs)
+    @settings(deadline=10000)
     def test_dropout_ratio0(self, X, in_place, output_mask, engine, gc, dc):
         """Test with ratio=0 for a deterministic reference impl."""
         # TODO(lukeyeager): enable this path when the op is fixed

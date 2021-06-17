@@ -1,4 +1,13 @@
-#include "THBlas.h"
+#include <TH/THBlas.h>
 
-#include "generic/THBlas.cpp"
-#include "THGenerateAllTypes.h"
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THBlas.cpp>
+#include <TH/THGenerateAllTypes.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THBlas.cpp>
+#include <TH/THGenerateBFloat16Type.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THBlas.cpp>
+#include <TH/THGenerateHalfType.h>

@@ -1,5 +1,5 @@
 #ifndef THC_GENERIC_FILE
-#define THC_GENERIC_FILE "generic/ClassNLLCriterion.cu"
+#define THC_GENERIC_FILE "THCUNN/generic/ClassNLLCriterion.cu"
 #else
 
 void THNN_(ClassNLLCriterion_updateOutput)(
@@ -11,13 +11,12 @@ void THNN_(ClassNLLCriterion_updateOutput)(
            THCTensor *weights,
            THCTensor *total_weight,
            int64_t ignore_index) {
-  if (THCIndexTensor_(nDimensionLegacyNoScalars)(state, target) > 1) {
+  if (THCIndexTensor_(nDimension)(state, target) > 1) {
     THError("multi-target not supported");
   }
 
   int n_dims = THCTensor_(nDimensionLegacyNoScalars)(state, input);
   int n_classes = THCTensor_(sizeLegacyNoScalars)(state, input, n_dims - 1);
-  ignore_index -= TH_INDEX_BASE;
 
   if (weights) {
     THCUNN_assertSameGPU(
@@ -29,7 +28,9 @@ void THNN_(ClassNLLCriterion_updateOutput)(
     );
   }
 
-  THArgCheck(!input->is_empty() && (n_dims <= 2 && n_dims > 0), 2, "non-empty vector or matrix expected");
+  if (n_dims != 1 && n_dims != 2) {
+    THError("input tensor should be 1D or 2D");
+  }
 
   int64_t batch_size = n_dims == 1 ? 1 : THCTensor_(sizeLegacyNoScalars)(state, input, 0);
   int64_t num_targets = THCudaLongTensor_sizeLegacyNoScalars(state, target, 0);
@@ -43,23 +44,26 @@ void THNN_(ClassNLLCriterion_updateOutput)(
             " but got weight tensor of shape: %s", n_classes, s1.str);
   }
 
-  if (reduction == Reduction::None && n_dims == 2) {
+  if (reduction == at::Reduction::None && n_dims == 2) {
     THCTensor_(resize1d)(state, output, batch_size);
+    if (batch_size == 0) {
+      // This guards from unnecessary operations and launching CUDA kernel with 0 blocks.
+      return;
+    }
     if (weights) {
       weights = THCTensor_(newContiguous)(state, weights);
     }
 
-    ClassNLLCriterion_updateOutput_no_reduce_kernel<real>
-      <<<GET_BLOCKS(batch_size), CUDA_NUM_THREADS, 0, THCState_getCurrentStream(state)>>>(
+    ClassNLLCriterion_updateOutput_no_reduce_kernel<scalar_t>
+      <<<GET_BLOCKS(batch_size), CUDA_NUM_THREADS, 0, c10::cuda::getCurrentCUDAStream()>>>(
         batch_size,
-        toDeviceTensor<real, 2>(state, input),
+        toDeviceTensor<scalar_t, 2>(state, input),
         toDeviceTensor<THCIndex_t, 1>(state, target),
-        toDeviceTensor<real, 1>(state, output),
+        toDeviceTensor<scalar_t, 1>(state, output),
         weights ? THCTensor_(data)(state, weights) : NULL,
         n_classes,
         ignore_index);
-
-    THCudaCheck(cudaGetLastError());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     if (weights) {
       THCTensor_(free)(state, weights);
@@ -67,48 +71,48 @@ void THNN_(ClassNLLCriterion_updateOutput)(
     return;
   }
 
-  THCTensor_(resize1d)(state, output, 1);
-  THCTensor_(resize1d)(state, total_weight, 1);
+  THCTensor_(resize0d)(state, output);
+  THCTensor_(resize0d)(state, total_weight);
 
   input = THCTensor_(newContiguous)(state, input);
   weights = weights ? THCTensor_(newContiguous)(state, weights) : NULL;
   target = THCIndexTensor_(newContiguous)(state, target);
 
-  real *input_data = THCTensor_(data)(state, input);
-  real *weights_data = weights ? THCTensor_(data)(state, weights) : NULL;
+  scalar_t *input_data = THCTensor_(data)(state, input);
+  scalar_t *weights_data = weights ? THCTensor_(data)(state, weights) : NULL;
   THCIndex_t  *target_data = THCIndexTensor_(data)(state, target);
-  real *output_data = THCTensor_(data)(state, output);
-  real *total_weight_data = THCTensor_(data)(state, total_weight);
+  scalar_t *output_data = THCTensor_(data)(state, output);
+  scalar_t *total_weight_data = THCTensor_(data)(state, total_weight);
 
   if (THCTensor_(nDimensionLegacyNoScalars)(state, input) == 1) {
-    cunn_ClassNLLCriterion_updateOutput_kernel1<real>
-      <<<1, 1, 0, THCState_getCurrentStream(state)>>>(
+    cunn_ClassNLLCriterion_updateOutput_kernel1<scalar_t>
+      <<<1, 1, 0, c10::cuda::getCurrentCUDAStream()>>>(
         output_data,
         total_weight_data,
         input_data,
         target_data,
         weights_data,
-        reduction == Reduction::ElementwiseMean,
+        reduction == at::Reduction::Mean,
         n_classes,
         ignore_index
     );
-
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
   } else if (THCTensor_(nDimensionLegacyNoScalars)(state, input) == 2) {
-    cunn_ClassNLLCriterion_updateOutput_kernel<real, accreal>
-      <<<1, NTHREADS, 0, THCState_getCurrentStream(state)>>>(
+    cunn_ClassNLLCriterion_updateOutput_kernel<scalar_t, accreal>
+      <<<1, NTHREADS, 0, c10::cuda::getCurrentCUDAStream()>>>(
         output_data,
         total_weight_data,
         input_data,
         target_data,
         weights_data,
-        reduction == Reduction::ElementwiseMean,
+        reduction == at::Reduction::Mean,
         THCTensor_(size)(state, input, 0),
         THCTensor_(size)(state, input, 1),
         n_classes,
         ignore_index
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
   }
-  THCudaCheck(cudaGetLastError());
 
   if (weights) {
     THCTensor_(free)(state, weights);
@@ -149,7 +153,9 @@ void THNN_(ClassNLLCriterion_updateGradInput)(
     );
   }
 
-  THArgCheck(!input->is_empty() && (n_dims <= 2 && n_dims > 0), 2, "non-empty vector or matrix expected");
+  if (n_dims != 1 && n_dims != 2) {
+    THError("input tensor should be 1D or 2D");
+  }
 
   int64_t batch_size = n_dims == 1 ? 1 : THCTensor_(size)(state, input, 0);
   int64_t num_targets = THCudaLongTensor_sizeLegacyNoScalars(state, target, 0);
@@ -161,23 +167,26 @@ void THNN_(ClassNLLCriterion_updateGradInput)(
     THError("weight tensor should be defined either for all or no classes");
   }
 
-  if (reduction == Reduction::None && n_dims == 2) {
+  if (reduction == at::Reduction::None && n_dims == 2) {
     THCUNN_check_dim_size(state, gradOutput, 1, 0, batch_size);
+    if (batch_size == 0) {
+      // This guards from unnecessary operations and launching CUDA kernel with 0 blocks.
+      return;
+    }
     if (weights) {
       weights = THCTensor_(newContiguous)(state, weights);
     }
 
-    ClassNLLCriterion_updateGradInput_no_reduce_kernel<real>
-      <<<GET_BLOCKS(batch_size), CUDA_NUM_THREADS, 0, THCState_getCurrentStream(state)>>>(
+    ClassNLLCriterion_updateGradInput_no_reduce_kernel<scalar_t>
+      <<<GET_BLOCKS(batch_size), CUDA_NUM_THREADS, 0, c10::cuda::getCurrentCUDAStream()>>>(
         batch_size,
         toDeviceTensor<THCIndex_t, 1>(state, target),
-        toDeviceTensor<real, 1>(state, gradOutput),
-        toDeviceTensor<real, 2>(state, gradInput),
+        toDeviceTensor<scalar_t, 1>(state, gradOutput),
+        toDeviceTensor<scalar_t, 2>(state, gradInput),
         weights ? THCTensor_(data)(state, weights) : NULL,
         n_classes,
         ignore_index);
-
-    THCudaCheck(cudaGetLastError());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     if (weights) {
       THCTensor_(free)(state, weights);
@@ -185,46 +194,45 @@ void THNN_(ClassNLLCriterion_updateGradInput)(
     return;
   }
 
-  ignore_index -= TH_INDEX_BASE;
-
   weights = weights ? THCTensor_(newContiguous)(state, weights) : NULL;
   target = THCIndexTensor_(newContiguous)(state, target);
 
   THCUNN_check_dim_size(state, gradOutput, 1, 0, 1);
-  real *gradOutput_data = THCTensor_(data)(state, gradOutput);
-  real *weights_data = weights ? THCTensor_(data)(state, weights) : NULL;
-  real *gradInput_data = THCTensor_(data)(state, gradInput);
+  scalar_t *gradOutput_data = THCTensor_(data)(state, gradOutput);
+  scalar_t *weights_data = weights ? THCTensor_(data)(state, weights) : NULL;
+  scalar_t *gradInput_data = THCTensor_(data)(state, gradInput);
   THCIndex_t  *target_data = THCIndexTensor_(data)(state, target);
-  real *total_weight_data = THCTensor_(data)(state, total_weight);
+  scalar_t *total_weight_data = THCTensor_(data)(state, total_weight);
 
   if (THCTensor_(nDimensionLegacyNoScalars)(state, input) == 1) {
-    cunn_ClassNLLCriterion_updateGradInput_kernel1<real>
-      <<<1, 1, 0, THCState_getCurrentStream(state)>>>(
+    cunn_ClassNLLCriterion_updateGradInput_kernel1<scalar_t>
+      <<<1, 1, 0, c10::cuda::getCurrentCUDAStream()>>>(
         gradInput_data,
         gradOutput_data,
         weights_data,
         target_data,
         total_weight_data,
-        reduction == Reduction::ElementwiseMean,
+        reduction == at::Reduction::Mean,
         n_classes,
         ignore_index
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
   } else {
-    cunn_ClassNLLCriterion_updateGradInput_kernel<real>
-      <<<1, NTHREADS, 0, THCState_getCurrentStream(state)>>>(
+    cunn_ClassNLLCriterion_updateGradInput_kernel<scalar_t>
+      <<<1, NTHREADS, 0, c10::cuda::getCurrentCUDAStream()>>>(
         gradInput_data,
         gradOutput_data,
         target_data,
         weights_data,
         total_weight_data,
-        reduction == Reduction::ElementwiseMean,
+        reduction == at::Reduction::Mean,
         THCTensor_(size)(state, input, 0),
         THCTensor_(size)(state, input, 1),
         n_classes,
         ignore_index
     );
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
   }
-  THCudaCheck(cudaGetLastError());
 
   if (weights) {
     THCTensor_(free)(state, weights);

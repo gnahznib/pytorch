@@ -10,16 +10,16 @@ template <>
 bool CosineEmbeddingCriterionOp<CPUContext>::RunOnDevice() {
   auto& S = Input(0);
   auto& Y = Input(1);
-  auto* output = Output(0);
+
   CAFFE_ENFORCE(
-      S.size() == Y.size(),
+      S.numel() == Y.numel(),
       "The embedding and label should have the same size.");
-  output->ResizeLike(S);
+  auto* output = Output(0, S.sizes(), at::dtype<float>());
 
   const float* Sdata = S.data<float>();
   const int* Ydata = Y.data<int>();
   float* output_data = output->template mutable_data<float>();
-  for (int i = 0; i < S.size(); ++i) {
+  for (int i = 0; i < S.numel(); ++i) {
     output_data[i] =
         Ydata[i] == 1 ? (1.f - Sdata[i]) : std::max(0.f, Sdata[i] - margin_);
   }
@@ -31,28 +31,30 @@ bool CosineEmbeddingCriterionGradientOp<CPUContext>::RunOnDevice() {
   auto& S = Input(0);
   auto& Y = Input(1);
   auto& dOutput = Input(2);
-  auto* dS = Output(0);
 
-  dS->ResizeLike(S);
+  auto* dS = Output(0, S.sizes(), at::dtype<float>());
 
   const float* Sdata = S.data<float>();
   const int* Ydata = Y.data<int>();
   const float* dOutput_data = dOutput.data<float>();
   float* dSdata = dS->template mutable_data<float>();
-  for (int i = 0; i < S.size(); ++i) {
+  for (int i = 0; i < S.numel(); ++i) {
     dSdata[i] = dOutput_data[i] *
         (Ydata[i] == 1 ? -1.f : static_cast<float>(Sdata[i] >= margin_));
   }
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     CosineEmbeddingCriterion,
     CosineEmbeddingCriterionOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     CosineEmbeddingCriterionGradient,
     CosineEmbeddingCriterionGradientOp<CPUContext>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(CosineEmbeddingCriterion)
     .NumInputs(2)
     .NumOutputs(1)
@@ -67,6 +69,7 @@ the label, and computes the elementwise criterion output as
     .Input(1, "Y", "The label as a 1-dim TensorCPU with int value of 1 or -1.")
     .Output(0, "loss", "The output loss with the same dimensionality as S.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(CosineEmbeddingCriterionGradient).NumInputs(3).NumOutputs(1);
 
 class GetCosineEmbeddingCriterionGradient : public GradientMakerBase {
@@ -79,6 +82,7 @@ class GetCosineEmbeddingCriterionGradient : public GradientMakerBase {
         vector<string>{GI(0)});
   }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(
     CosineEmbeddingCriterion,
     GetCosineEmbeddingCriterionGradient);

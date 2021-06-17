@@ -1,7 +1,20 @@
-#include "THTensor.hpp"
-#include "THVector.h"
-#include "THBlas.h"
-#include "THTensorDimApply.h"
+#include <TH/THTensor.hpp>
+#include <TH/THVector.h>
+#include <TH/THBlas.h>
+#include <TH/THTensorDimApply.h>
 
-#include "generic/THTensorMoreMath.cpp"
-#include "THGenerateAllTypes.h"
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THTensorMoreMath.cpp>
+#include <TH/THGenerateAllTypes.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THTensorMoreMath.cpp>
+#include <TH/THGenerateBoolType.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THTensorMoreMath.cpp>
+#include <TH/THGenerateBFloat16Type.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THTensorMoreMath.cpp>
+#include <TH/THGenerateHalfType.h>

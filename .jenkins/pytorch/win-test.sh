@@ -1,93 +1,107 @@
 #!/bin/bash
+set -ex
+# shellcheck disable=SC2034
+COMPACT_JOB_NAME=pytorch-win-ws2019-cuda10-cudnn7-py3-test
 
-COMPACT_JOB_NAME=pytorch-win-ws2016-cuda9-cudnn7-py3-test
-source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+SCRIPT_PARENT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+# shellcheck source=./common.sh
+source "$SCRIPT_PARENT_DIR/common.sh"
 
+IMAGE_COMMIT_ID=$(git rev-parse HEAD)
+export IMAGE_COMMIT_ID
 export IMAGE_COMMIT_TAG=${BUILD_ENVIRONMENT}-${IMAGE_COMMIT_ID}
 if [[ ${JOB_NAME} == *"develop"* ]]; then
   export IMAGE_COMMIT_TAG=develop-${IMAGE_COMMIT_TAG}
 fi
 
-mkdir -p ci_scripts/
+export TMP_DIR="${PWD}/build/win_tmp"
+TMP_DIR_WIN=$(cygpath -w "${TMP_DIR}")
+export TMP_DIR_WIN
+export PROJECT_DIR="${PWD}"
+PROJECT_DIR_WIN=$(cygpath -w "${PROJECT_DIR}")
+export PROJECT_DIR_WIN
+export TEST_DIR="${PWD}/test"
+TEST_DIR_WIN=$(cygpath -w "${TEST_DIR}")
+export TEST_DIR_WIN
+export PYTORCH_FINAL_PACKAGE_DIR="${PYTORCH_FINAL_PACKAGE_DIR:-/c/users/circleci/workspace/build-results}"
+PYTORCH_FINAL_PACKAGE_DIR_WIN=$(cygpath -w "${PYTORCH_FINAL_PACKAGE_DIR}")
+export PYTORCH_FINAL_PACKAGE_DIR_WIN
+export PYTORCH_TEST_SKIP_NOARCH=1
 
-cat >ci_scripts/download_image.py << EOL
+mkdir -p "$TMP_DIR"/build/torch
 
-import os
-import sys
-import boto3
-import botocore
 
-IMAGE_COMMIT_TAG = os.getenv('IMAGE_COMMIT_TAG')
+# This directory is used only to hold "pytorch_env_restore.bat", called via "setup_pytorch_env.bat"
+CI_SCRIPTS_DIR=$TMP_DIR/ci_scripts
+mkdir -p "$CI_SCRIPTS_DIR"
 
-session = boto3.session.Session()
-s3 = session.resource('s3')
-BUCKET_NAME = 'ossci-windows-build'
-KEY = 'pytorch/'+IMAGE_COMMIT_TAG+'.7z'
-LOCAL_FILE_PATH = sys.argv[1]
-try:
-    s3.Bucket(BUCKET_NAME).download_file(KEY, LOCAL_FILE_PATH)
-except botocore.exceptions.ClientError as e:
-    if e.response['Error']['Code'] == "404":
-        print("The object does not exist.")
-    else:
-        raise
+if [ -n "$(ls "$CI_SCRIPTS_DIR"/*)" ]; then
+    rm "$CI_SCRIPTS_DIR"/*
+fi
 
-EOL
 
-cat >ci_scripts/setup_pytorch_env.bat <<EOL
+export SCRIPT_HELPERS_DIR=$SCRIPT_PARENT_DIR/win-test-helpers
 
-set PATH=C:\\Program Files\\CMake\\bin;C:\\Program Files\\7-Zip;C:\\ProgramData\\chocolatey\\bin;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Amazon\\AWSCLI;%PATH%
+# Try to pull value from CIRCLE_PULL_REQUEST
+# NOTE: file_diff_from_base is currently bugged for GHA due to an issue finding a merge base for ghstack PRs
+#       see https://github.com/pytorch/pytorch/issues/60111
+IN_PULL_REQUEST=${CIRCLE_PULL_REQUEST:-}
+if [ -n "$IN_PULL_REQUEST" ]; then
+  DETERMINE_FROM="${TMP_DIR}/determine_from"
+  file_diff_from_base "$DETERMINE_FROM"
+fi
 
-:: Install Miniconda3
-IF EXIST C:\\Jenkins\\Miniconda3 ( rd /s /q C:\\Jenkins\\Miniconda3 )
-curl https://repo.continuum.io/miniconda/Miniconda3-latest-Windows-x86_64.exe -O
-.\Miniconda3-latest-Windows-x86_64.exe /InstallationType=JustMe /RegisterPython=0 /S /AddToPath=0 /D=C:\\Jenkins\\Miniconda3
-call C:\\Jenkins\\Miniconda3\\Scripts\\activate.bat C:\\Jenkins\\Miniconda3
-call conda install -y -q numpy mkl cffi pyyaml boto3
-
-pip install ninja
-
-call "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\VC\\Auxiliary\\Build\\vcvarsall.bat" x86_amd64
-
-set PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.0\\bin;C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.0\\libnvvp;%PATH%
-set CUDA_PATH=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.0
-set CUDA_PATH_V9_0=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.0
-set NVTOOLSEXT_PATH=C:\\Program Files\\NVIDIA Corporation\\NvToolsExt
-set CUDNN_LIB_DIR=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.0\\lib\\x64
-set CUDA_TOOLKIT_ROOT_DIR=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.0
-set CUDNN_ROOT_DIR=C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v9.0
-set PYTHONPATH=%CD%\\test;%PYTHONPATH%
-
-cd test/
-
-python ..\\ci_scripts\\download_image.py %IMAGE_COMMIT_TAG%.7z
-
-7z x %IMAGE_COMMIT_TAG%.7z
-
-cd ..
-
-EOL
-
-cat >ci_scripts/test_python_nn.bat <<EOL
-call ci_scripts/setup_pytorch_env.bat
-cd test/ && python run_test.py --include nn --verbose && cd ..
-EOL
-
-cat >ci_scripts/test_python_all_except_nn.bat <<EOL
-call ci_scripts/setup_pytorch_env.bat
-cd test/ && python run_test.py --exclude nn --verbose && cd ..
-EOL
+if [[ "${BUILD_ENVIRONMENT}" == *cuda11* ]]; then
+  export BUILD_SPLIT_CUDA=ON
+fi
 
 run_tests() {
+    # Run nvidia-smi if available
+    for path in '/c/Program Files/NVIDIA Corporation/NVSMI/nvidia-smi.exe' /c/Windows/System32/nvidia-smi.exe; do
+        if [[ -x "$path" ]]; then
+            "$path" || echo "true";
+            break
+        fi
+    done
+
     if [ -z "${JOB_BASE_NAME}" ] || [[ "${JOB_BASE_NAME}" == *-test ]]; then
-        ci_scripts/test_python_nn.bat && ci_scripts/test_python_all_except_nn.bat
+        "$SCRIPT_HELPERS_DIR"/test_python.bat "$DETERMINE_FROM"
+        "$SCRIPT_HELPERS_DIR"/test_custom_script_ops.bat
+        "$SCRIPT_HELPERS_DIR"/test_custom_backend.bat
+        "$SCRIPT_HELPERS_DIR"/test_libtorch.bat
     else
+        if [[ "${BUILD_ENVIRONMENT}" == "pytorch-win-vs2019-cpu-py3" ]]; then
+          export PYTORCH_COLLECT_COVERAGE=1
+          export COVERAGE_RCFILE=$PWD/.coveragerc # coverage config file needed for plug-ins and settings to work
+        fi
         if [[ "${JOB_BASE_NAME}" == *-test1 ]]; then
-            ci_scripts/test_python_nn.bat
+            "$SCRIPT_HELPERS_DIR"/test_python_first_shard.bat "$DETERMINE_FROM"
+            "$SCRIPT_HELPERS_DIR"/test_libtorch.bat
+            if [[ "${USE_CUDA}" == "1" ]]; then
+              "$SCRIPT_HELPERS_DIR"/test_python_jit_legacy.bat "$DETERMINE_FROM"
+            fi
         elif [[ "${JOB_BASE_NAME}" == *-test2 ]]; then
-            ci_scripts/test_python_all_except_nn.bat
+            "$SCRIPT_HELPERS_DIR"/test_python_second_shard.bat "$DETERMINE_FROM"
+            "$SCRIPT_HELPERS_DIR"/test_custom_backend.bat
+            "$SCRIPT_HELPERS_DIR"/test_custom_script_ops.bat
         fi
     fi
 }
 
-run_tests && echo "TEST PASSED"
+run_tests
+assert_git_not_dirty
+echo "TEST PASSED"
+
+if [[ "${BUILD_ENVIRONMENT}" == "pytorch-win-vs2019-cpu-py3" ]]; then
+  pushd "$TEST_DIR"
+  python -mpip install coverage==5.5
+  python -mpip install -e "$PROJECT_DIR/tools/coverage_plugins_package"
+  echo "Generating XML coverage report"
+  time python -mcoverage xml
+  popd
+
+  pushd "$PROJECT_DIR"
+  python -mpip install codecov
+  python -mcodecov
+  popd
+fi

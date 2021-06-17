@@ -54,11 +54,12 @@ template <>
 bool AffineChannelGradientOp<float, CPUContext>::RunOnDeviceWithOrderNCHW() {
   const auto& dY = Input(0);
   const auto& scale = is_learnable_ ? Input(2) : Input(1);
-  auto* dX = Output(0);
-  dX->ResizeLike(dY);
+
+  auto* dX = Output(0, dY.sizes(), at::dtype<float>());
   const int N = dY.dim32(0);
   const int C = dY.dim32(1);
-  const int HxW = dY.size() / (N * C);
+  // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions,bugprone-narrowing-conversions)
+  const int HxW = dY.numel() / (N * C);
   const float* dY_data = dY.data<float>();
   const float* scale_data = scale.data<float>();
   const std::array<int, 3> X_dims = {N, C, HxW};
@@ -75,10 +76,9 @@ bool AffineChannelGradientOp<float, CPUContext>::RunOnDeviceWithOrderNCHW() {
   if (is_learnable_) {
     const auto& X = Input(1);
     const float* X_data = X.data<float>();
-    auto* dscale = Output(1);
-    auto* dbias = Output(2);
-    dscale->ResizeLike(scale);
-    dbias->ResizeLike(scale);
+
+    auto* dscale = Output(1, scale.sizes(), at::dtype<float>());
+    auto* dbias = Output(2, scale.sizes(), at::dtype<float>());
     AffineChannelScaleBiasBackwardNCHW<float>(
         N,
         C,
@@ -95,11 +95,12 @@ template <>
 bool AffineChannelGradientOp<float, CPUContext>::RunOnDeviceWithOrderNHWC() {
   const auto& dY = Input(0);
   const auto& scale = is_learnable_ ? Input(2) : Input(1);
-  auto* dX = Output(0);
-  dX->ResizeLike(dY);
-  const int ndim = dY.ndim();
+
+  auto* dX = Output(0, dY.sizes(), at::dtype<float>());
+  const int ndim = dY.dim();
   const int C = dY.dim32(ndim - 1);
-  const int rows = dY.size() / C;
+  // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions,bugprone-narrowing-conversions)
+  const int rows = dY.numel() / C;
   const int cols = C;
   const float* dY_data = dY.data<float>();
   const float* scale_data = scale.data<float>();
@@ -115,10 +116,9 @@ bool AffineChannelGradientOp<float, CPUContext>::RunOnDeviceWithOrderNHWC() {
     const float* X_data = X.data<float>();
     const int N = X.dim32(0);
     const int HxW = rows / N;
-    auto* dscale = Output(1);
-    auto* dbias = Output(2);
-    dscale->ResizeLike(scale);
-    dbias->ResizeLike(scale);
+
+    auto* dscale = Output(1, scale.sizes(), at::dtype<float>());
+    auto* dbias = Output(2, scale.sizes(), at::dtype<float>());
     AffineChannelScaleBiasBackwardNHWC<float>(
         N,
         C,
@@ -131,11 +131,14 @@ bool AffineChannelGradientOp<float, CPUContext>::RunOnDeviceWithOrderNHWC() {
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(AffineChannel, AffineChannelOp<float, CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     AffineChannelGradient,
     AffineChannelGradientOp<float, CPUContext>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(AffineChannel)
     .NumInputs(3)
     .NumOutputs(1)
@@ -157,6 +160,7 @@ for replacing spatial batch norm with its equivalent fixed transformation.
         "transformation for the c-th channel of the input.")
     .Output(0, "Y", "Output with the same order of Input.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(AffineChannelGradient)
     .NumInputs({2, 3})
     .NumOutputs({1, 3})
@@ -188,6 +192,7 @@ class GetAffineChannelGradient : public GradientMakerBase {
 
 } // namespace
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(AffineChannel, GetAffineChannelGradient);
 
 } // namespace caffe2

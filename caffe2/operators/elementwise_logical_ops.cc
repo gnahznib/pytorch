@@ -3,9 +3,11 @@
 namespace caffe2 {
 namespace {
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(Where, WhereOp<CPUContext>);
 
 // Input: C, X, Y, output: Z
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Where)
     .NumInputs(3)
     .NumOutputs(1)
@@ -20,11 +22,14 @@ produces one output data (Tensor) where z = c ? x : y is applied elementwise.
     .Input(2, "Y", "input tensor")
     .Output(0, "Z", "output tensor");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(Where);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(IsMemberOf, IsMemberOfOp<CPUContext>);
 
 // Input: X, output: Y
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(IsMemberOf)
     .NumInputs(1)
     .NumOutputs(1)
@@ -63,7 +68,7 @@ op = core.CreateOperator(
     value=[0,2,4,6,8],
 )
 
-# Use a not-empty tensor
+// Use a not-empty tensor
 workspace.FeedBlob("X", np.array([0,1,2,3,4,5,6,7,8]).astype(np.int32))
 print("X:\n", workspace.FetchBlob("X"))
 
@@ -75,7 +80,7 @@ print("Y: \n", workspace.FetchBlob("Y"))
 **Result**
 
 ```
-# value=[0,2,4,6,8]
+// value=[0,2,4,6,8]
 
 X:
  [0 1 2 3 4 5 6 7 8]
@@ -90,6 +95,7 @@ Y:
     .Input(0, "X", "Input tensor of any shape")
     .Output(0, "Y", "Output tensor (same size as X containing booleans)");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(IsMemberOf);
 
 } // namespace

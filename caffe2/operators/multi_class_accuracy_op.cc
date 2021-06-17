@@ -6,17 +6,16 @@ template <>
 bool MultiClassAccuracyOp<float, CPUContext>::RunOnDevice() {
   auto& X = Input(PREDICTION);
   auto& label = Input(LABEL);
-  auto* Y0 = Output(0);
-  auto* Y1 = Output(1);
-  DCHECK_EQ(X.ndim(), 2);
+
+  DCHECK_EQ(X.dim(), 2);
   // amount, number of instances
   int N = X.dim32(0);
   // dimension, number of classes
   int D = X.dim32(1);
-  DCHECK_EQ(label.ndim(), 1);
+  DCHECK_EQ(label.dim(), 1);
   DCHECK_EQ(label.dim32(0), N);
-  Y0->Resize(D);
-  Y1->Resize(D);
+  auto* Y0 = Output(0, {D}, at::dtype<float>());
+  auto* Y1 = Output(1, {D}, at::dtype<int>());
 
   const auto* Xdata = X.data<float>();
   const auto* labeldata = label.data<int>();
@@ -45,6 +44,7 @@ bool MultiClassAccuracyOp<float, CPUContext>::RunOnDevice() {
   for (int i = 0; i < D; ++i) {
     int amount = amounts[i];
     if (amount) {
+      // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions,bugprone-narrowing-conversions)
       accuracies[i] /= amount;
     }
   }
@@ -52,9 +52,11 @@ bool MultiClassAccuracyOp<float, CPUContext>::RunOnDevice() {
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
   MultiClassAccuracy, MultiClassAccuracyOp<float, CPUContext>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(MultiClassAccuracy)
   .NumInputs(2)
   .NumOutputs(2)
@@ -82,5 +84,6 @@ and predicted scores of each class for each instance.
     "amounts",
     "1-D int tensor (D,) of number of instances for each class in the batch.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(MultiClassAccuracy);
 }  // namespace caffe2

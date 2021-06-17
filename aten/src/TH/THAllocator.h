@@ -2,9 +2,7 @@
 
 #include <TH/THGeneral.h>
 
-#ifdef __cplusplus
-#include <ATen/Allocator.h>
-#endif
+#include <c10/core/Allocator.h>
 
 #define TH_ALLOCATOR_MAPPED_SHARED 1
 #define TH_ALLOCATOR_MAPPED_SHAREDMEM 2
@@ -14,28 +12,19 @@
 #define TH_ALLOCATOR_MAPPED_FROMFD 32
 #define TH_ALLOCATOR_MAPPED_UNLINK 64
 
-#ifdef __cplusplus
-using THAllocator = at::Allocator;
-#else
-// struct at_THAllocator doesn't and will never exist, but we cannot name
-// the actual struct because it's a namespaced C++ thing
-typedef struct at_THAllocator THAllocator;
-#endif
-
 /* default malloc/free allocator. malloc and realloc raise an error (using
  * THError) on allocation failure.
  */
-TH_API THAllocator* getTHDefaultAllocator(void);
+TH_API c10::Allocator* getTHDefaultAllocator(void);
 
-#ifdef __cplusplus
 // Sentinel value/type to help distinguish the file descriptor constructor from
 // the non-file descriptor constructor
 enum WithFd { WITH_FD };
 
-class AT_API THMapAllocator {
-public:
-  THMapAllocator(const char *filename, int flags, size_t size);
-  THMapAllocator(WithFd, const char *filename, int fd, int flags, size_t size);
+class TORCH_API THMapAllocator {
+ public:
+  THMapAllocator(std::string filename, int flags, size_t size);
+  THMapAllocator(WithFd, std::string filename, int fd, int flags, size_t size);
   THMapAllocator(const THMapAllocator&) = delete;
   THMapAllocator& operator=(const THMapAllocator&) = delete;
   THMapAllocator(THMapAllocator&&) = delete;
@@ -56,7 +45,7 @@ public:
   virtual void* data() const { return base_ptr_; }
 
   static THMapAllocator* fromDataPtr(const at::DataPtr&);
-  static at::DataPtr makeDataPtr(const char *filename, int flags, size_t size, size_t* actual_size_out);
+  static at::DataPtr makeDataPtr(std::string filename, int flags, size_t size, size_t* actual_size_out);
   static at::DataPtr makeDataPtr(WithFd, const char *filename, int fd, int flags, size_t size, size_t* actual_size_out);
 
   // Closes the data.  Helps us avoid destructor shenanigans
@@ -64,7 +53,7 @@ public:
 
   // This is very dangerous.  You have to redefine this destructor for each
   // subclass
-  virtual ~THMapAllocator() { close(); }
+  virtual ~THMapAllocator();
 
 protected:
   bool closed_ = false;
@@ -82,12 +71,14 @@ protected:
 };
 
 // Base-from-member idiom
-struct AT_API THRefcountedMapAllocatorArgCheck {
+struct TORCH_API THRefcountedMapAllocatorArgCheck {
   THRefcountedMapAllocatorArgCheck(int flags);
 };
 
-class AT_API THRefcountedMapAllocator : private THRefcountedMapAllocatorArgCheck, public THMapAllocator {
-public:
+class TORCH_API THRefcountedMapAllocator
+    : private THRefcountedMapAllocatorArgCheck,
+      public THMapAllocator {
+ public:
   THRefcountedMapAllocator(const char *filename, int flags, size_t size);
   THRefcountedMapAllocator(WithFd, const char *filename, int fd, int flags, size_t size);
 
@@ -107,5 +98,3 @@ protected:
   void checkFlags();
   void initializeAlloc();
 };
-
-#endif // __cplusplus

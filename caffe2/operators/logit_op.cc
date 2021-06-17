@@ -6,6 +6,11 @@
 #include "caffe2/operators/elementwise_ops.h"
 #include "caffe2/utils/eigen_utils.h"
 
+#include "caffe2/operators/bucketize_op.h"
+
+#include "caffe2/core/operator.h"
+#include "caffe2/core/tensor.h"
+
 namespace caffe2 {
 
 template <>
@@ -24,20 +29,21 @@ template <>
 bool LogitGradientOp<float, CPUContext>::RunOnDevice() {
   const auto& X = Input(0);
   const auto& dY = Input(1);
-  auto* dX = Output(0);
-  dX->ResizeLike(X);
-  int channels = X.dim32(X.ndim() - 1);
+
+  auto* dX = Output(0, X.sizes(), at::dtype<float>());
+  int channels = X.dim32(X.dim() - 1);
   ConstEigenArrayMap<float> Xmat(
-      X.template data<float>(), channels, X.size() / channels);
+      X.template data<float>(), channels, X.numel() / channels);
   ConstEigenArrayMap<float> dYmat(
-      dY.template data<float>(), channels, X.size() / channels);
+      dY.template data<float>(), channels, X.numel() / channels);
   EigenArrayMap<float> dXmat(
-      dX->template mutable_data<float>(), channels, X.size() / channels);
+      dX->template mutable_data<float>(), channels, X.numel() / channels);
   dXmat = (Xmat < eps_ || Xmat > 1.0 - eps_)
               .select(0, dYmat * ((1 - Xmat) * Xmat).inverse());
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     Logit,
     UnaryElementwiseWithArgsOp<
@@ -45,8 +51,10 @@ REGISTER_CPU_OPERATOR(
         CPUContext,
         LogitFunctor<CPUContext>>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(LogitGradient, LogitGradientOp<float, CPUContext>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Logit)
     .NumInputs(1)
     .NumOutputs(1)
@@ -60,6 +68,7 @@ input data clampped in (eps, 1-eps).
     .Input(0, "X", "input float tensor")
     .Output(0, "Y", "output float tensor");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(LogitGradient)
     .NumInputs(2)
     .NumOutputs(1)
@@ -83,6 +92,17 @@ class GetLogitGradient : public GradientMakerBase {
 
 } // namespace
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(Logit, GetLogitGradient);
 
 } // namespace caffe2
+
+using LogitOp = caffe2::UnaryElementwiseWithArgsOp<
+    caffe2::TensorTypes<float>,
+    caffe2::CPUContext,
+    caffe2::LogitFunctor<caffe2::CPUContext>>;
+
+C10_EXPORT_CAFFE2_OP_TO_C10_CPU(
+    Logit,
+    "_caffe2::Logit(Tensor X, float eps = 1e-6)->Tensor Y",
+    LogitOp);

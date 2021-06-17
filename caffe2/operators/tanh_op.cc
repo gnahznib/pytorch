@@ -17,6 +17,7 @@ bool TanhFunctor<CPUContext>::operator()<float>(
 }
 #endif // CAFFE2_USE_ACCELERATE
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     Tanh,
     UnaryElementwiseOp<
@@ -24,6 +25,7 @@ REGISTER_CPU_OPERATOR(
         CPUContext,
         TanhFunctor<CPUContext>>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Tanh)
     .NumInputs(1)
     .NumOutputs(1)
@@ -88,8 +90,13 @@ X:
         "output",
         "The hyperbolic tangent values of the input tensor, computed "
         "element-wise")
-    .InheritOnnxSchema("Tanh");
+    .InheritOnnxSchema();
 
-OPERATOR_SCHEMA(TanhGradient).NumInputs(2).NumOutputs(1).AllowInplace({{1, 0}});
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+OPERATOR_SCHEMA(TanhGradient)
+    .NumInputs(2)
+    .NumOutputs(1)
+    .IdenticalTypeAndShapeOfInput(1)
+    .AllowInplace({{1, 0}});
 
 } // namespace caffe2

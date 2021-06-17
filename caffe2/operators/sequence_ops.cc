@@ -4,6 +4,31 @@
 
 namespace caffe2 {
 
+vector<TensorShape> TensorInferenceForAddPadding(
+    const OperatorDef& def,
+    const vector<TensorShape>& in) {
+  ArgumentHelper helper(def);
+  const int padding_width = helper.GetSingleArgument<int>("padding_width", 1);
+  const int end_padding_width = helper.GetSingleArgument<int>("end_padding_width", padding_width);
+  CAFFE_ENFORCE_GT(in.size(), 0);
+  CAFFE_ENFORCE_GE(in[0].dims_size(), 1);
+  if (in.size() > 1) {
+    CAFFE_ENFORCE_EQ(in[1].dims_size(), 1);
+  }
+
+  const auto num_paddings = (in.size() == 1 ? 1 : in[1].dims(0));
+  vector<int> out_shape(in[0].dims().begin(), in[0].dims().end());
+  out_shape[0] += (padding_width + end_padding_width) * num_paddings;
+
+  if (def.output_size() == 1) {
+    return vector<TensorShape>{CreateTensorShape(out_shape, in[0].data_type())};
+  } else {
+    return vector<TensorShape>{
+      CreateTensorShape(out_shape, in[0].data_type()),
+      CreateTensorShape(vector<int>(1, num_paddings), TensorProto::INT32)};
+  }
+}
+
 template <>
 template <typename T>
 void GatherPaddingOp<CPUContext>::GatherPadding(
@@ -51,10 +76,11 @@ template <>
 template <typename T>
 bool RemovePaddingOp<CPUContext>::DoRunWithType() {
   const auto& in = Input(0);
-  CAFFE_ENFORCE_GE(in.ndim(), 1);
-  const int32_t outer_size = in.dims()[0];
+  CAFFE_ENFORCE_GE(in.dim(), 1);
+  const int32_t outer_size = in.sizes()[0];
   const auto block_size = std::accumulate(
-      in.dims().begin() + 1, in.dims().end(), 1, std::multiplies<TIndex>());
+      // NOLINTNEXTLINE(modernize-use-transparent-functors)
+      in.sizes().begin() + 1, in.sizes().end(), 1, std::multiplies<int64_t>());
   const auto pad_width = startPaddingWidth_ + endPaddingWidth_;
 
   // if no lengths is provided, assume it is a single full-span entry
@@ -63,15 +89,13 @@ bool RemovePaddingOp<CPUContext>::DoRunWithType() {
   if (InputSize() > 1) {
     const auto& lengths = Input(1);
     lengths_ptr = lengths.data<int32_t>();
-    lengths_size = lengths.size();
+    lengths_size = lengths.numel();
   }
 
-  auto* out = Output(0);
-  {
-    auto out_dims = in.dims();
-    out_dims[0] -= pad_width * lengths_size;
-    out->Resize(std::move(out_dims));
-  }
+  auto out_dims = in.sizes().vec();
+  out_dims[0] -= pad_width * lengths_size;
+  auto* out = Output(0, std::move(out_dims), at::dtype<T>());
+
   const auto* in_ptr = in.template data<T>();
   auto* out_ptr = out->template mutable_data<T>();
   int64_t total_length = 0;
@@ -90,8 +114,8 @@ bool RemovePaddingOp<CPUContext>::DoRunWithType() {
   if (OutputSize() == 1) {
     return true;
   }
-  auto* lengths_out = Output(1);
-  lengths_out->Resize(lengths_size);
+
+  auto* lengths_out = Output(1, {lengths_size}, at::dtype<int32_t>());
   std::transform(
       lengths_ptr,
       lengths_ptr + lengths_size,
@@ -150,8 +174,8 @@ bool AddPaddingOp<CPUContext>::MakePadding(
   if (OutputSize() == 1) {
     return true;
   }
-  auto* lengths_out = Output(1);
-  lengths_out->Resize(lengths_size);
+
+  auto* lengths_out = Output(1, {lengths_size}, at::dtype<int32_t>());
   const auto pad_width = startPaddingWidth_ + endPaddingWidth_;
   std::transform(
       lengths_ptr,
@@ -165,22 +189,21 @@ template <>
 bool PadEmptySamplesOp<CPUContext>::RunOnDevice() {
   auto& lengths = Input(0);
   auto* lengthsPtr = lengths.template data<int32_t>();
-  CAFFE_ENFORCE(lengths.ndim() == 1, "LENGTH should be 1-D");
+  CAFFE_ENFORCE(lengths.dim() == 1, "LENGTH should be 1-D");
   CAFFE_ENFORCE(InputSize() >= 1, "Input size must be no less than 1");
 
-  auto* out_lengths = Output(0);
   int needPadding = 0;
   int sumLen = 0;
-  for (int i = 0; i < lengths.size(); ++i) {
+  for (int i = 0; i < lengths.numel(); ++i) {
     if (lengthsPtr[i] == 0) {
       needPadding++;
     }
     sumLen += lengthsPtr[i];
   }
 
-  out_lengths->Resize(lengths.size());
+  auto* out_lengths = Output(0, {lengths.numel()}, at::dtype<int32_t>());
   auto* outLengthsPtr = out_lengths->template mutable_data<int32_t>();
-  for (int i = 0; i < lengths.size(); ++i) {
+  for (int i = 0; i < lengths.numel(); ++i) {
     if (lengthsPtr[i] == 0) {
       outLengthsPtr[i] = 1;
     } else {
@@ -190,41 +213,46 @@ bool PadEmptySamplesOp<CPUContext>::RunOnDevice() {
 
   for (int k = 0; k < InputSize() - 1; k++) {
     auto& features = Input(1 + k);
-    CAFFE_ENFORCE(features.ndim() >= 1, "FEATURE should at least 1-D");
+    CAFFE_ENFORCE(features.dim() >= 1, "FEATURE should at least 1-D");
     CAFFE_ENFORCE(
-        features.dim(0) == sumLen, "FEATURE and LENGTH should be consistent");
+        features.size(0) == sumLen, "FEATURE and LENGTH should be consistent");
     const auto block_size = features.size_from_dim(1);
 
     auto* out_features = Output(1 + k);
-    auto outDim = features.dims();
+    auto outDim = features.sizes().vec();
     outDim.at(0) += needPadding;
     out_features->Resize(outDim);
     auto dst =
-        static_cast<char*>(out_features->raw_mutable_data(features.meta()));
+        static_cast<char*>(out_features->raw_mutable_data(features.dtype()));
     auto src_base = static_cast<const char*>(features.raw_data());
     // copy data and add padding index as zero
     Tensor zero{CPU};
     zero.Resize(block_size);
-    auto zeroPtr =
-        static_cast<const char*>(zero.raw_mutable_data(features.meta()));
+    auto zeroPtr = static_cast<char*>(zero.raw_mutable_data(features.dtype()));
+    // TODO Handle other composite types, such as vector<...>
+    if (!features.dtype().Match<std::string>()) {
+      memset(zeroPtr, 0, zero.nbytes());
+    }
     int start_dest = 0;
     int start_src = 0;
-    for (int i = 0; i < lengths.size(); ++i) {
+    for (int i = 0; i < lengths.numel(); ++i) {
       if (lengthsPtr[i] == 0) {
         context_.CopyItemsSameDevice(
-            features.meta(),
+            features.dtype(),
             block_size,
             zeroPtr,
-            dst + start_dest * features.meta().itemsize());
+            dst + start_dest * features.dtype().itemsize());
         start_dest += block_size;
       } else {
-        auto src = src_base + start_src * features.meta().itemsize();
+        auto src = src_base + start_src * features.dtype().itemsize();
         context_.CopyItemsSameDevice(
-            features.meta(),
+            features.dtype(),
             lengthsPtr[i] * block_size,
             src,
-            dst + start_dest * features.meta().itemsize());
+            dst + start_dest * features.dtype().itemsize());
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         start_src += lengthsPtr[i] * block_size;
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions,cppcoreguidelines-narrowing-conversions)
         start_dest += lengthsPtr[i] * block_size;
       }
     }
@@ -232,9 +260,13 @@ bool PadEmptySamplesOp<CPUContext>::RunOnDevice() {
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(AddPadding, AddPaddingOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(RemovePadding, RemovePaddingOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(GatherPadding, GatherPaddingOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(PadEmptySamples, PadEmptySamplesOp<CPUContext>);
 
 struct GetAddPaddingGradient : public GradientMakerBase {
@@ -257,6 +289,7 @@ struct GetAddPaddingGradient : public GradientMakerBase {
       if (Def().input_size() == 4) {
         padding_grads.push_back(GI(3));
       }
+      // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
       auto g_inputs2 = g_inputs;
       ops.push_back(
           CreateOperatorDef("GatherPadding", "", g_inputs2, padding_grads));
@@ -264,6 +297,7 @@ struct GetAddPaddingGradient : public GradientMakerBase {
     return ops;
   }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(AddPadding, GetAddPaddingGradient);
 
 struct GetRemovePaddingGradient : public GradientMakerBase {
@@ -279,11 +313,15 @@ struct GetRemovePaddingGradient : public GradientMakerBase {
     return SingleGradientDef("AddPadding", "", g_inputs, vector<string>{GI(0)});
   }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(RemovePadding, GetRemovePaddingGradient);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(AddPadding)
     .NumInputs(1, 4)
     .NumOutputs(1, 2)
+    .TensorInferenceFunction(
+        OpSchema::NeedsAllInputShapes(TensorInferenceForAddPadding))
     .SetDoc(R"DOC(
 Given a partitioned tensor $T<N, D_1, ..., D_n>$, where the partitions are
 defined as ranges on its outer-most (slowest varying) dimension $N$,
@@ -392,6 +430,7 @@ lengths_out: [5]
         "lengths_out",
         "*(type: Tensor`<int>`)* [OPTIONAL] Lengths for each padded range.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(RemovePadding)
     .NumInputs(1, 2)
     .NumOutputs(1, 2)
@@ -489,6 +528,7 @@ lengths_out_rm: [3]
         "lengths_out",
         "*(type: Tensor`<int>`)* [OPTIONAL] Lengths for each padded range.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(GatherPadding)
     .NumInputs(2)
     .NumOutputs(1, 2)
@@ -516,6 +556,7 @@ order to compute the gradients of AddPadding w.r.t the padding tensors.
         "end_padding_sum",
         "T<D1..., Dn> Sum of all end paddings, if provided.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(PadEmptySamples)
     .NumInputs(1, INT_MAX)
     .NumOutputs(1, INT_MAX)

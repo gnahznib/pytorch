@@ -5,10 +5,12 @@
 
 namespace caffe2 {
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     Exp,
     UnaryElementwiseOp<TensorTypes<float>, CPUContext, ExpFunctor<CPUContext>>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Exp)
     .NumInputs(1)
     .NumOutputs(1)
@@ -69,7 +71,7 @@ X after running op:
         "Y",
         "*(type: Tensor`<float>`)* The exponential of the input tensor computed "
         "element-wise.")
-    .InheritOnnxSchema("Exp");
+    .InheritOnnxSchema();
 
 namespace {
 
@@ -86,6 +88,7 @@ class GetExpGradient : public GradientMakerBase {
 
 } // namespace
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(Exp, GetExpGradient);
 
 } // namespace caffe2

@@ -1,11 +1,13 @@
 #include "caffe2/operators/minmax_ops.h"
-#include "caffe2/utils/eigen_utils.h"
 
 namespace caffe2 {
 
-REGISTER_CPU_OPERATOR(Max, MaxOp<float, CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(Min, MinOp<float, CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+REGISTER_CPU_OPERATOR(Max, MaxOp<float, CPUContext>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Max)
     .NumInputs(1, INT_MAX)
     .NumOutputs(1)
@@ -73,11 +75,18 @@ Max:
 </details>
 
 )DOC")
-    .Input(0, "X, Y, ...", "*(type: Tensor`<Ord>`)* List of input tensors with the same shape.")
-    .Output(0, "M", "*(type: Tensor`<Ord>`)* Output tensor with same dimensions as input(s)."
-    "Contains the maximum valued element at each location.")
-    .InheritOnnxSchema("Max");
+    .Input(
+        0,
+        "X, Y, ...",
+        "*(type: Tensor`<Ord>`)* List of input tensors with the same shape.")
+    .Output(
+        0,
+        "M",
+        "*(type: Tensor`<Ord>`)* Output tensor with same dimensions as input(s)."
+        "Contains the maximum valued element at each location.")
+    .InheritOnnxSchema();
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Min)
     .NumInputs(1, INT_MAX)
     .NumOutputs(1)
@@ -138,39 +147,15 @@ Min:
 </details>
 
 )DOC")
-    .Input(0, "X, Y, ...", "*(type: Tensor`<Ord>`)* List of input tensors with the same shape.")
-    .Output(0, "M", "*(type: Tensor`<Ord>`)* Output tensor with same dimensions as input(s)."
-"Contains the minimum valued element at each location.")
-    .InheritOnnxSchema("Min");
-
-template <typename T, class Context>
-bool MaxOp<T, Context>::Compute() {
-  auto& input0 = Input(0);
-  const int N = input0.size();
-  T* output_data = Output(0)->template mutable_data<T>();
-
-  for (int i = 1; i < InputSize(); i++) {
-    auto input_data = Input(i).template data<T>();
-    EigenVectorMap<T> output_vec(output_data, N);
-    output_vec = output_vec.cwiseMax(ConstEigenVectorMap<T>(input_data, N));
-  }
-
-  return true;
-}
-
-template <typename T, class Context>
-bool MinOp<T, Context>::Compute() {
-  auto& input0 = Input(0);
-  const int N = input0.size();
-  T* output_data = Output(0)->template mutable_data<T>();
-
-  for (int i = 1; i < InputSize(); i++) {
-    auto input_data = Input(i).template data<T>();
-    EigenVectorMap<T> output_vec(output_data, N);
-    output_vec = output_vec.cwiseMin(ConstEigenVectorMap<T>(input_data, N));
-  }
-
-  return true;
-}
+    .Input(
+        0,
+        "X, Y, ...",
+        "*(type: Tensor`<Ord>`)* List of input tensors with the same shape.")
+    .Output(
+        0,
+        "M",
+        "*(type: Tensor`<Ord>`)* Output tensor with same dimensions as input(s)."
+        "Contains the minimum valued element at each location.")
+    .InheritOnnxSchema();
 
 } // namespace caffe2

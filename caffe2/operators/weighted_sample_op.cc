@@ -9,31 +9,31 @@ bool WeightedSampleOp<float, CPUContext>::RunOnDevice() {
       OutputSize(),
       "The number of tensors of the input and the output must be the same.");
   auto& weights = Input(0);
-  int batch_size = weights.dim(0);
-  int weights_dim = weights.dim(1);
-  auto* out_idx = Output(0);
+  int batch_size = weights.size(0);
+  int weights_dim = weights.size(1);
 
   if (batch_size > 0 && weights_dim > 0) {
     cum_mass_.resize(weights_dim);
     const float* mat_weights = weights.template data<float>();
     const float* mat_values = nullptr;
-    out_idx->Resize(batch_size, 1);
+    auto* out_idx = Output(0, {batch_size, 1}, at::dtype<int>());
     int* output_indices = out_idx->template mutable_data<int>();
     float* output_values = nullptr;
 
     if (InputSize() == 2) {
       auto& values = Input(1);
       CAFFE_ENFORCE_EQ(
-          weights.dims(),
-          values.dims(),
+          weights.sizes(),
+          values.sizes(),
           "The sampling weights tensor and the sampling values tensor must have the same dimensions.");
       mat_values = values.template data<float>();
-      auto* out_value = Output(1);
-      out_value->Resize(batch_size, 1);
+
+      auto* out_value = Output(1, {batch_size, 1}, at::dtype<float>());
       output_values = out_value->template mutable_data<float>();
     }
 
     for (int i = 0; i < batch_size; i++) {
+      // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
       float r;
       int offset = i * weights_dim;
 
@@ -57,11 +57,10 @@ bool WeightedSampleOp<float, CPUContext>::RunOnDevice() {
       }
     }
   } else {
-    out_idx->Resize(0);
-    out_idx->template mutable_data<int>();
+    // NOLINTNEXTLINE(clang-diagnostic-unused-variable,clang-analyzer-deadcode.DeadStores)
+    auto* out_idx = Output(0, {0}, at::dtype<int>());
     if (OutputSize() == 2) {
-      auto* out_value = Output(1);
-      out_value->Resize(0);
+      auto* out_value = Output(1, {0}, at::dtype<float>());
       out_value->template mutable_data<float>();
     }
   }
@@ -69,8 +68,10 @@ bool WeightedSampleOp<float, CPUContext>::RunOnDevice() {
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(WeightedSample, WeightedSampleOp<float, CPUContext>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(WeightedSample)
     .NumInputs(1, 2)
     .NumOutputs(1, 2)
@@ -113,5 +114,6 @@ contains the index(es) of the sampled output.
         "The output tensor contains value(s) selected by the sampled index(es)"
         "It is a 1-D Tensor of size (batch_size x 1)");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(WeightedSample);
 } // namespace caffe2

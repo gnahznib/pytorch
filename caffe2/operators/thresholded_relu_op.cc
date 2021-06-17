@@ -8,11 +8,12 @@ namespace caffe2 {
 template <>
 bool ThresholdedReluOp<float, CPUContext>::RunOnDevice() {
   auto& X = Input(0);
-  auto* Y = Output(0);
-  Y->ResizeLike(X);
 
-  ConstEigenVectorArrayMap<float> Xvec(X.data<float>(), X.size());
-  EigenVectorArrayMap<float> Yvec(Y->template mutable_data<float>(), Y->size());
+  auto* Y = Output(0, X.sizes(), at::dtype<float>());
+
+  ConstEigenVectorArrayMap<float> Xvec(X.data<float>(), X.numel());
+  EigenVectorArrayMap<float> Yvec(
+      Y->template mutable_data<float>(), Y->numel());
   Yvec = (Xvec > alpha_).select(Xvec, 0.f);
   /* Naive implementation
   const float* Xdata = X.data<float>();
@@ -29,16 +30,16 @@ template <>
 bool ThresholdedReluGradientOp<float, CPUContext>::RunOnDevice() {
   auto& Y = Input(0);
   auto& dY = Input(1);
-  auto* dX = Output(0);
-  CAFFE_ENFORCE_EQ(dY.size(), Y.size());
-  dX->ResizeLike(Y);
+
+  CAFFE_ENFORCE_EQ(dY.numel(), Y.numel());
+  auto* dX = Output(0, Y.sizes(), at::dtype<float>());
 
   const float* Ydata = Y.data<float>();
   const float* dYdata = dY.data<float>();
   float* dXdata = dX->template mutable_data<float>();
-  EigenVectorArrayMap<float> dXvec(dXdata, dX->size());
-  ConstEigenVectorArrayMap<float> Yvec(Ydata, Y.size());
-  ConstEigenVectorArrayMap<float> dYvec(dYdata, dY.size());
+  EigenVectorArrayMap<float> dXvec(dXdata, dX->numel());
+  ConstEigenVectorArrayMap<float> Yvec(Ydata, Y.numel());
+  ConstEigenVectorArrayMap<float> dYvec(dYdata, dY.numel());
   dXvec = dYvec * Yvec.cwiseSign();
   /* Non vectorized implementation
   for (int i = 0; i < Y.size(); ++i) {
@@ -48,12 +49,15 @@ bool ThresholdedReluGradientOp<float, CPUContext>::RunOnDevice() {
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(ThresholdedRelu, ThresholdedReluOp<float, CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     ThresholdedReluGradient,
     ThresholdedReluGradientOp<float, CPUContext>);
 
 // Input: X, output: Y
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(ThresholdedRelu)
     .NumInputs(1)
     .NumOutputs(1)
@@ -70,6 +74,7 @@ otherwise, is applied to the tensor elementwise.
     .Output(0, "Y", "1D input tensor");
 
 // Input: Y, dY, output: dX
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(ThresholdedReluGradient)
     .NumInputs(2)
     .NumOutputs(1)
@@ -89,6 +94,7 @@ class GetThresholdedReluGradient : public GradientMakerBase {
         vector<string>{GI(0)});
   }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(ThresholdedRelu, GetThresholdedReluGradient);
 
 } // namespace caffe2

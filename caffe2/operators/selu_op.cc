@@ -8,11 +8,12 @@ namespace caffe2 {
 template <>
 bool SeluOp<float, CPUContext>::RunOnDevice() {
   auto& X = Input(0);
-  auto* Y = Output(0);
-  Y->ResizeLike(X);
 
-  ConstEigenVectorArrayMap<float> Xvec(X.data<float>(), X.size());
-  EigenVectorArrayMap<float> Yvec(Y->template mutable_data<float>(), Y->size());
+  auto* Y = Output(0, X.sizes(), at::dtype<float>());
+
+  ConstEigenVectorArrayMap<float> Xvec(X.data<float>(), X.numel());
+  EigenVectorArrayMap<float> Yvec(
+      Y->template mutable_data<float>(), Y->numel());
   Yvec = lambda_ * (Xvec > 0).select(Xvec, (alpha_ * Xvec.exp() - alpha_));
   return true;
 }
@@ -21,24 +22,27 @@ template <>
 bool SeluGradientOp<float, CPUContext>::RunOnDevice() {
   auto& Y = Input(0);
   auto& dY = Input(1);
-  auto* dX = Output(0);
-  CAFFE_ENFORCE_EQ(dY.size(), Y.size());
-  dX->ResizeLike(Y);
 
-  ConstEigenVectorArrayMap<float> Yvec(Y.data<float>(), Y.size());
-  ConstEigenVectorArrayMap<float> dYvec(dY.data<float>(), dY.size());
+  CAFFE_ENFORCE_EQ(dY.numel(), Y.numel());
+  auto* dX = Output(0, Y.sizes(), at::dtype<float>());
+
+  ConstEigenVectorArrayMap<float> Yvec(Y.data<float>(), Y.numel());
+  ConstEigenVectorArrayMap<float> dYvec(dY.data<float>(), dY.numel());
   EigenVectorArrayMap<float> dXvec(
-      dX->template mutable_data<float>(), dX->size());
+      dX->template mutable_data<float>(), dX->numel());
 
   const float la = lambda_ * alpha_;
   dXvec = (Yvec > 0).select(lambda_ * dYvec, dYvec * (Yvec + la));
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(Selu, SeluOp<float, CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(SeluGradient, SeluGradientOp<float, CPUContext>);
 
 // Input: X; output: Y
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Selu)
     .NumInputs(1)
     .NumOutputs(1)
@@ -101,13 +105,18 @@ Y:
 </details>
 
 )DOC")
-    .Arg("alpha", "*(type: float; default: 1.673263~)* Alpha constant in equation.")
-    .Arg("scale", "*(type: float; default: 1.050700~; must be > 1.0)* Scale constant in equation.")
+    .Arg(
+        "alpha",
+        "*(type: float; default: 1.673263~)* Alpha constant in equation.")
+    .Arg(
+        "scale",
+        "*(type: float; default: 1.050700~; must be > 1.0)* Scale constant in equation.")
     .Input(0, "X", "Input tensor of data to be operated on.")
     .Output(0, "Y", "Output tensor with same shape as input.")
-    .InheritOnnxSchema("Selu");
+    .InheritOnnxSchema();
 
 // Input: Y, dY; output: dX
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(SeluGradient)
     .NumInputs(2)
     .NumOutputs(1)
@@ -137,6 +146,7 @@ class GetSeluGradient : public GradientMakerBase {
         vector<string>{GI(0)});
   }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(Selu, GetSeluGradient);
 
 } // namespace caffe2

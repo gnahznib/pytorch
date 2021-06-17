@@ -42,6 +42,7 @@ bool ReluGradientFunctor<CPUContext>::Forward(
     T* dX,
     CPUContext* /* context */) const {
   const int size = std::accumulate(
+      // NOLINTNEXTLINE(modernize-use-transparent-functors)
       Y_dims.cbegin(), Y_dims.cend(), 1, std::multiplies<int>());
   EigenVectorArrayMap<T>(dX, size) =
       (ConstEigenVectorArrayMap<T>(Y, size) > T(0))
@@ -61,13 +62,15 @@ OpSchema::Cost CostInferenceForRelu(
 
 } // namespace
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     Relu,
     UnaryElementwiseOp<
         TensorTypes<float>,
         CPUContext,
         ReluFunctor<CPUContext>>);
-REGISTER_CPU_OPERATOR(
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+REGISTER_CPU_GRADIENT_OPERATOR(
     ReluGradient,
     BinaryElementwiseOp<
         TensorTypes<float>,
@@ -75,6 +78,7 @@ REGISTER_CPU_OPERATOR(
         ReluGradientFunctor<CPUContext>>);
 
 // Input: X, output: Y
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Relu)
     .NumInputs(1)
     .NumOutputs(1)
@@ -105,7 +109,7 @@ op = core.CreateOperator(
   ["Y"]
   )
 
-workspace.FeedBlob("X", np.random.randn(4, 4).astype(np.float32)) # NCHW
+workspace.FeedBlob("X", np.random.randn(4, 4).astype(np.float32)) // NCHW
 print("X:\n", workspace.FetchBlob("X"), "\n")
 
 workspace.RunOperatorOnce(op)
@@ -137,13 +141,15 @@ Y:
 )DOC")
     .Input(0, "X", "1D input tensor")
     .Output(0, "Y", "1D output tensor with same shape as input")
-    .InheritOnnxSchema("Relu");
+    .InheritOnnxSchema();
 
 // Input: Y, dY, output: dX
-OPERATOR_SCHEMA(ReluGradient)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+GRADIENT_OPERATOR_SCHEMA(ReluGradient)
     .NumInputs(2)
     .NumOutputs(1)
     .AllowInplace({{1, 0}})
+    .IdenticalTypeAndShapeOfInput(1)
     .SetDoc(R"DOC(
 ReluGradient takes both Y and dY and uses this to update dX according to the
 chain rule and derivatives of the rectified linear function.
@@ -164,6 +170,7 @@ class GetReluGradient : public GradientMakerBase {
 
 } // namespace
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(Relu, GetReluGradient);
 
 } // namespace caffe2

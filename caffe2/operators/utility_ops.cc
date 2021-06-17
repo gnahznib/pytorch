@@ -14,50 +14,91 @@ bool WeightedSumGradientOp<CPUContext>::RunOnDevice() {
   return DoRunWithType<float>();
 }
 
+std::vector<TensorShape> WeightedSumShapeInference(
+    const OperatorDef& /* unused */,
+    const vector<TensorShape>& in) {
+  vector<TensorShape> out(1);
+  out[0] = in[0];
+  return out;
+}
+
+OpSchema::Cost CostInferenceForWeightedSum(
+    const OperatorDef& /* unused */,
+    const vector<TensorShape>& in) {
+  CAFFE_ENFORCE_EQ(
+      in.size() % 2, 0, "WeightedSum requires an even number of inputs");
+  struct OpSchema::Cost c;
+
+  const auto& X0 = in[0];
+  const auto& nElem = nElemFromDim(X0);
+  const auto& nInputs = in.size();
+  c.flops = (nInputs - 1) * nElem;
+  c.bytes_read = (nInputs / 2) * (nElem + 1) * sizeof(X0.data_type());
+  c.bytes_written = nElem * sizeof(X0.data_type());
+  c.params_bytes = (nInputs / 2) * sizeof(X0.data_type());
+  return c;
+}
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(WallClockTime, WallClockTimeOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(Print, PrintOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(FlattenToVec, FlattenToVecOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(Alias, AliasOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(ResizeLike, ResizeLikeOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(SumInt, SumOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(WeightedSum, WeightedSumOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(WeightedSumGradient, WeightedSumGradientOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     ScatterWeightedSum,
     ScatterWeightedSumOp<float, CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(ScatterAssign, ScatterAssignOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+REGISTER_CPU_OPERATOR(Scatter, ScatterOp<CPUContext>);
 
-// From CPU, copy it to whatever the current context
-REGISTER_CPU_OPERATOR(
-    CopyFromCPUInput,
-    CopyOp<CPUContext, CPUContext, CPUContext>);
-REGISTER_CPU_OPERATOR(
-    CopyOnDeviceLike,
-    CopyOnDeviceLikeOp<CPUContext, CPUContext, CPUContext>);
-REGISTER_CPU_OPERATOR(Copy, CopyOp<CPUContext, CPUContext, CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(LengthsToShape, LengthsToShapeOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(HasElements, HasElementsOp<CPUContext>);
-REGISTER_CPU_OPERATOR(IsEmpty, IsEmptyOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(GatherRanges, GatherRangesOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(LengthsGather, LengthsGatherOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(LengthsToSegmentIds, LengthsToSegmentIdsOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(LengthsToRanges, LengthsToRangesOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+REGISTER_CPU_OPERATOR(LengthsToOffsets, LengthsToOffsetsOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(SegmentIdsToLengths, SegmentIdsToLengthsOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(SegmentIdsToRanges, SegmentIdsToRangesOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(LengthsToWeights, LengthsToWeightsOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(EnsureDense, EnsureDenseOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     AccumulateHistogram,
     AccumulateHistogramOp<float, CPUContext>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(WallClockTime)
     .NumInputs(0)
     .NumOutputs(1)
     .SetDoc("Time since epoch in nanoseconds.")
     .Output(0, "time", "The time in nanoseconds.");
 
-REGISTER_CPU_OPERATOR(UnsafeCoalesce, UnsafeCoalesceOp<CPUContext>);
-
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Print)
     .NumInputs(1)
     .NumOutputs(0)
@@ -71,11 +112,10 @@ OPERATOR_SCHEMA(Print)
         "limit",
         "(int, default 0) If set, prints the first `limit` elements of tensor. "
         "If 0, prints the first `k_limit_default`(1000) elements of tensor")
-    .Arg(
-        "every_n",
-        "(int, default 1) Print tensor every `every_n` runs")
+    .Arg("every_n", "(int, default 1) Print tensor every `every_n` runs")
     .Input(0, "tensor", "The tensor to print.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(LengthsToShape)
     .NumInputs(1)
     .NumOutputs(1)
@@ -104,17 +144,17 @@ op = core.CreateOperator(
     ["Y"]
 )
 
-# Create X: Sample softmax output for 5-class model
+// Create X: Sample softmax output for 5-class model
 X = np.array([2,2,2,2,2,2,2,2,2,2])
 print("X:\n",X)
 
-# Feed X into workspace
+// Feed X into workspace
 workspace.FeedBlob("X", X.astype(np.int32))
 
-# Run op
+// Run op
 workspace.RunOperatorOnce(op)
 
-# Collect Output
+// Collect Output
 print("Y:\n", workspace.FetchBlob("Y"))
 
 ```
@@ -141,6 +181,7 @@ Y:
         0,
         "Y",
         "Vector of length 2 describing the dimensions of the data if the $N$ vectors from the input were combined to a single matrix.");
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(FlattenToVec)
     .NumInputs(1)
     .NumOutputs(1)
@@ -207,8 +248,12 @@ output:
 
 )DOC")
     .Input(0, "input", "A tensor of rank >= 1.")
-    .Output(0, "output", "A tensor of rank 1 (vector) with the contents of the input tensor.");
+    .Output(
+        0,
+        "output",
+        "A tensor of rank 1 (vector) with the contents of the input tensor.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Alias)
     .NumInputs(1)
     .NumOutputs(1)
@@ -229,14 +274,15 @@ similar to multi-thread computation before you use it explicitly.
     .Input(0, "input", "Input tensor whose storage will be shared.")
     .Output(0, "output", "Tensor of same shape as input, sharing its storage.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(ResizeLike)
     .NumInputs(2)
     .NumOutputs(1)
-    .TensorInferenceFunction([](const OperatorDef& /*def*/,
+    .TensorInferenceFunction([](const OperatorDef& def,
                                 const vector<TensorShape>& in) {
       vector<TensorShape> out(1);
-      out.push_back(in[1]);
-      out[0].set_data_type(in[0].data_type());
+      out.at(0) = in.at(1);
+      out.at(0).set_data_type(in.at(0).data_type());
       return out;
     })
     .SetDoc(R"DOC(
@@ -246,6 +292,7 @@ Produces tensor containing data of first input and shape of second input.
     .Input(1, "shape_tensor", "Tensor whose shape will be applied to output.")
     .Output(0, "output", "Tensor with data of input 0 and shape of input 1.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(SumInt)
     .NumInputs(1, INT_MAX)
     .NumOutputs(1)
@@ -259,9 +306,12 @@ OPERATOR_SCHEMA(SumInt)
     })
     .AllowInplace({{0, 0}});
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(WeightedSum)
     .NumInputs([](int n) { return (n > 0 && n % 2 == 0); })
     .NumOutputs(1)
+    .TensorInferenceFunction(WeightedSumShapeInference)
+    .CostInferenceFunction(CostInferenceForWeightedSum)
     .AllowInplace({{0, 0}})
     .IdenticalTypeAndShapeOfInput(0)
     .SetDoc(R"DOC(
@@ -275,10 +325,12 @@ only be done with X_0 also as the output, but not other X_i.
     .Input(0, "weight_0", "Weight of the first input in the sum.")
     .Output(0, "output", "Result containing weighted elem-wise sum of inputs.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(WeightedSumGradient)
     .NumInputs([](int n) { return (n > 0 && n % 2 == 1); })
     .NumOutputs(1, INT_MAX);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(ScatterWeightedSum)
     .NumInputs([](int n) { return (n > 3 && (n - 3) % 2 == 0); })
     .NumOutputs(1)
@@ -323,10 +375,17 @@ Currently only works on CPU because of access to INDICES.
     .Output(0, "X_0", "Has to be exactly the same tensor as the input 0")
     .EnforceInplace({{0, 0}});
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(ScatterAssign)
     .NumInputs(3)
     .NumOutputs(1)
     .EnforceInplace({{0, 0}})
+    .TensorInferenceFunction([](const OperatorDef& /* unused */,
+                                const vector<TensorShape>& in) {
+      vector<TensorShape> out(1);
+      out[0] = in[0];
+      return out;
+    })
     .SetDoc(R"DOC(
 Update slices of the tensor in-place by overriding current value.
 
@@ -353,139 +412,44 @@ Currently only works on CPU because of access to INDICES.
         "Update slices, with shape len(INDICES) + shape(X_0)[1:]")
     .Output(0, "DATA", "Has to be exactly the same tensor as the input 0");
 
-OPERATOR_SCHEMA(Copy)
-    .NumInputs(1)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+OPERATOR_SCHEMA(Scatter)
+    .NumInputs(3)
     .NumOutputs(1)
-    .IdenticalTypeAndShape()
-    .InputsCanCrossDevices()
+    .AllowInplace({{0, 0}})
     .SetDoc(R"DOC(
-Copy input tensor into output, potentially across devices.
+Update values of the tensor by overriding current value specified by indices.
 
-Github Links:
+Writes all values from the tensor UPDATES into DATA at the indices specified in the INDICES tensor.
+For each value in DATA, its output index is specified by its index in UPDATES and by the corresponding value in INDICES for the specified axis.
 
-- https://github.com/caffe2/caffe2/blob/master/caffe2/operators/utility_ops.cc
-- https://github.com/caffe2/caffe2/blob/master/caffe2/operators/utility_ops.h
+For a 3-D tensor, DATA is updated as:
 
+DATA[INDICES[i][j][k]][j][k] = UPDATES[i][j][k]  # if axis == 0
+DATA[i][INDICES[i][j][k]][k] = UPDATES[i][j][k]  # if axis == 1
+DATA[i][j][INDICES[i][j][k]] = UPDATES[i][j][k]  # if axis == 2
 
-<details>
-
-<summary> <b>Example</b> </summary>
-
-**Code**
-
-```
-
-workspace.ResetWorkspace()
-
-op = core.CreateOperator(
-    "Copy",
-    ["input"],
-    ["output"]
-)
-
-workspace.FeedBlob("input", np.random.rand(3,3))
-print("input:", workspace.FetchBlob("input"))
-workspace.RunOperatorOnce(op)
-print("output:", workspace.FetchBlob("output"))
-
-```
-
-**Result**
-
-```
-
-input:
-[[0.16826761 0.68168217 0.55196001]
- [0.19735483 0.34837823 0.69015595]
- [0.09448514 0.57390828 0.37097193]]
-output:
-[[0.16826761 0.68168217 0.55196001]
- [0.19735483 0.34837823 0.69015595]
- [0.09448514 0.57390828 0.37097193]]
-
-```
-
-</details>
-
+Currently only works on CPU because of access to INDICES.
 )DOC")
-    .Input(0, "input", "(*Tensor*): input tensor to copy")
-    .Output(0, "output", "(*Tensor*): copy of input tensor");
+    .Input(0, "DATA", "Tensor to be updated.")
+    .Input(
+        1,
+        "INDICES",
+        "1-D list of indices on the first dimension"
+        "of X_0 that need to be updated")
+    .Input(
+        2,
+        "UPDATES",
+        "Update slices, with shape len(INDICES) + shape(X_0)[1:]")
+    .Output(0, "OUTPUT", "The updated output.")
+    .Arg("axis", "*(type: int; default: 1)* Which dimension to scatter on.");
 
-OPERATOR_SCHEMA(CopyGPUToCPU)
-    .NumInputs(1)
-    .NumOutputs(1)
-    .IdenticalTypeAndShape()
-    .InputsCanCrossDevices()
-    .DeviceInferenceFunction([](const OperatorDef& def) {
-      CAFFE_ENFORCE(
-          def.has_device_option(),
-          "CopyGPUToCPU op should have cuda device option.");
-      auto& cuda_option = def.device_option();
-      auto cpu_option = DeviceOption();
-      vector<DeviceOption> in_dev(def.input_size(), cuda_option);
-      vector<DeviceOption> out_dev(def.output_size(), cpu_option);
-      return std::make_pair(in_dev, out_dev);
-    })
-    .SetDoc(R"DOC(
-Copy tensor for GPU to CPU context. Must be run under GPU device option.
-)DOC")
-    .Input(0, "input", "The input tensor.")
-    .Output(0, "output", "Tensor that will contain a copy of the input.");
-
-OPERATOR_SCHEMA(CopyCPUToGPU)
-    .NumInputs(1)
-    .NumOutputs(1)
-    .IdenticalTypeAndShape()
-    .InputsCanCrossDevices()
-    .DeviceInferenceFunction([](const OperatorDef& def) {
-      CAFFE_ENFORCE(
-          def.has_device_option(),
-          "CopyCPUToGPU op should have cuda device option.");
-      auto& cuda_option = def.device_option();
-      auto cpu_option = DeviceOption();
-      vector<DeviceOption> in_dev(def.input_size(), cpu_option);
-      vector<DeviceOption> out_dev(def.output_size(), cuda_option);
-      return std::make_pair(in_dev, out_dev);
-    })
-    .SetDoc(R"DOC(
-Copy tensor for CPU to GPU context. Must be run under GPU device option.
-)DOC")
-    .Input(0, "input", "The input tensor.")
-    .Output(0, "output", "Tensor that will contain a copy of the input.");
-
-OPERATOR_SCHEMA(CopyFromCPUInput)
-    .NumInputs(1)
-    .NumOutputs(1)
-    .IdenticalTypeAndShape()
-    .InputsCanCrossDevices()
-    .DeviceInferenceFunction([](const OperatorDef& def) {
-      auto op_device =
-          def.has_device_option() ? def.device_option() : DeviceOption();
-      auto cpu_option = DeviceOption();
-      vector<DeviceOption> in_dev(def.input_size(), cpu_option);
-      vector<DeviceOption> out_dev(def.output_size(), op_device);
-      return std::make_pair(in_dev, out_dev);
-    })
-    .SetDoc(R"DOC(
-Take a CPU input tensor and copy it to an output in the current
-Context (GPU or CPU). This may involves cross-device MemCpy.
-)DOC")
-    .Input(0, "input", "The input CPU tensor.")
-    .Output(0, "output", "either a TensorCUDA or a TensorCPU");
-
-OPERATOR_SCHEMA(CopyOnDeviceLike)
-    .NumInputs(2)
-    .NumOutputs(1)
-    .SetDoc("Copy input tensor into output to the specific device.")
-    .Input(0, "input", "The input tensor.")
-    .Input(1, "dst", "Tensor, on which device the copy will be performed.")
-    .Output(0, "output", "Tensor that will contain a copy of the input.");
-
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(HasElements)
-    .NumInputs(1)
+    .NumInputs(1, INT_MAX)
     .NumOutputs(1)
     .SetDoc(R"DOC(
-The *HasElements* op accepts a single input $tensor$, and produces a single boolean output $has\_elements$. The output is *True* if and only if $tensor$ has size > 0. Note, this op is the opposite of the *IsEmpty* op.
+The *HasElements* op accepts a single or multiple input tensors, and produces a single boolean output $has\_elements$. The output is *True* if and only if any of the input tensor has size > 0. Note, this op is the opposite of the *IsEmpty* op.
 
 Github Links:
 
@@ -509,14 +473,14 @@ op = core.CreateOperator(
     ["has_elements"],
 )
 
-# Use a not-empty tensor
+// Use a not-empty tensor
 workspace.FeedBlob("tensor", np.random.randn(2, 2).astype(np.float32))
 print("tensor:\n", workspace.FetchBlob("tensor"))
 
 workspace.RunOperatorOnce(op)
 print("has_elements: ", workspace.FetchBlob("has_elements"),"\n")
 
-# Use an empty tensor
+// Use an empty tensor
 workspace.FeedBlob("tensor", np.empty(0))
 print("tensor:\n", workspace.FetchBlob("tensor"))
 
@@ -543,75 +507,16 @@ has_elements:  False
 </details>
 
 )DOC")
-    .Input(0, "tensor", "Input data tensor to check for elements.")
-    .Output(0, "has_elements", "Output scalar boolean tensor. True if input has size > 0.");
+    .Input(
+        0,
+        "X1, X2, ...",
+        "List of input data tensors to check for elements.")
+    .Output(
+        0,
+        "has_elements",
+        "Output scalar boolean tensor. True if input has size > 0.");
 
-OPERATOR_SCHEMA(IsEmpty)
-    .NumInputs(1)
-    .NumOutputs(1)
-    .SetDoc(R"DOC(
-The *IsEmpty* op accepts a single input $tensor$, and produces a single boolean output $is\_empty$. The output is *True* if and only if $tensor$ has size == 0.
-
-Github Links:
-
-- https://github.com/caffe2/caffe2/blob/master/caffe2/operators/utility_ops.cc
-- https://github.com/caffe2/caffe2/blob/master/caffe2/operators/utility_ops.h
-
-
-<details>
-
-<summary> <b>Example</b> </summary>
-
-**Code**
-
-```
-
-workspace.ResetWorkspace()
-
-op = core.CreateOperator(
-    "IsEmpty",
-    ["tensor"],
-    ["is_empty"],
-)
-
-# Use a not-empty tensor
-workspace.FeedBlob("tensor", np.random.randn(2, 2).astype(np.float32))
-print("tensor:\n", workspace.FetchBlob("tensor"))
-
-workspace.RunOperatorOnce(op)
-print("is_empty: ", workspace.FetchBlob("is_empty"),"\n")
-
-# Use an empty tensor
-workspace.FeedBlob("tensor", np.empty(0))
-print("tensor:\n", workspace.FetchBlob("tensor"))
-
-workspace.RunOperatorOnce(op)
-print("is_empty: ", workspace.FetchBlob("is_empty"))
-
-```
-
-**Result**
-
-```
-
-tensor:
- [[ 0.26018378  0.6778789 ]
- [-1.3097627  -0.40083608]]
-is_empty:  False
-
-tensor:
- []
-is_empty:  True
-
-```
-
-</details>
-
-)DOC")
-    .ScalarType(::caffe2::TensorProto_DataType::TensorProto_DataType_BOOL)
-    .Input(0, "tensor", "Input data tensor to check if empty.")
-    .Output(0, "is_empty", "Output scalar boolean tensor. True if input has size == 0.");
-
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(GatherRanges)
     .NumInputs(2)
     .NumOutputs(2)
@@ -655,21 +560,22 @@ Example:
         "LENGTHS",
         "1-D tensor of size N with lengths over gathered data"
         " for each row in a batch. sum(LENGTHS) == OUTPUT.size()")
-    .TensorInferenceFunction([](const OperatorDef& /* unused */,
-                                const vector<TensorShape>& in) {
-      std::vector<TensorShape> out(2);
+    .TensorInferenceFunction(OpSchema::NeedsAllInputShapes(
+        [](const OperatorDef& /* unused */, const vector<TensorShape>& in) {
+          std::vector<TensorShape> out(2);
 
-      int total = 1;
-      for (auto d : in[0].dims()) {
-        total *= d;
-      }
-      out[0].add_dims(total);
-      out[0].set_data_type(in[0].data_type());
-      out[1].add_dims(in[1].dims(0));
-      out[1].set_data_type(in[1].data_type());
-      return out;
-    });
+          int total = 1;
+          for (auto d : in[0].dims()) {
+            total *= d;
+          }
+          out[0].add_dims(total);
+          out[0].set_data_type(in[0].data_type());
+          out[1].add_dims(in[1].dims(0));
+          out[1].set_data_type(in[1].data_type());
+          return out;
+        }));
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(LengthsGather)
     .NumInputs(3)
     .NumOutputs(1)
@@ -692,6 +598,7 @@ Example:
     .Input(2, "INDICES", "indices into LENGTHS where items should be gathered")
     .Output(0, "OUTPUT", "1-D tensor containing gathered items");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(LengthsToSegmentIds)
     .NumInputs(1)
     .NumOutputs(1)
@@ -746,6 +653,7 @@ segment_ids:
     .Input(0, "lengths", "1D tensor of int32 or int64 segment lengths.")
     .Output(0, "segment_ids", "1D tensor of length *sum(lengths)*");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(LengthsToRanges)
     .NumInputs(1)
     .NumOutputs(1)
@@ -769,6 +677,32 @@ For example, `[1, 3, 0, 2]` transforms into `[[0, 1], [1, 3], [4, 0], [4, 2]]`.
         "ranges",
         "2D tensor of shape len(lengths) X 2 and the same type as `lengths`");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+OPERATOR_SCHEMA(LengthsToOffsets)
+    .NumInputs(1)
+    .NumOutputs(1)
+    .SetDoc(R"DOC(
+Given a vector of segment lengths, returns a vector of offsets from these lengths,
+which will have the same size as the input vector. Output is going to have
+the same type as input. For long tensors explicit casting from int32 to int64
+might be necessary prior to this op.
+
+For example, `[1, 3, 0, 2]` transforms into `[0, 1, 4, 4]`.
+)DOC")
+    .Input(0, "lengths", "1D tensor of int32 or int64 segment lengths.")
+    .Output(0, "offsets", "1D tensor of the same shape and type as `lengths`")
+    .TensorInferenceFunction([](const OperatorDef& def,
+                                const vector<TensorShape>& in) {
+      const ArgumentHelper args(def);
+      bool include_last_offset =
+          args.GetSingleArgument<bool>("include_last_offset", false);
+      vector<int> out_shape(in[0].dims().begin(), in[0].dims().end());
+      out_shape[0] += include_last_offset ? 1 : 0;
+      return vector<TensorShape>{
+          CreateTensorShape(out_shape, in[0].data_type())};
+    });
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(SegmentIdsToLengths)
     .NumInputs(1, 2)
     .NumOutputs(1)
@@ -791,6 +725,7 @@ cannot represent empty segments at the end (if the second input is absent).
         "if provided, number of segments = the size of its first dimension")
     .Output(0, "lengths", "1-D int64_t tensor of segment lengths");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(SegmentIdsToRanges)
     .NumInputs(1, 2)
     .NumOutputs(1)
@@ -809,6 +744,7 @@ index in the first input vector + 1.
         "if provided, number of segments = the size of its first dimension")
     .Output(0, "lengths", "1-D int64_t tensor of segment lengths");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(LengthsToWeights)
     .NumInputs(1)
     .NumOutputs(1)
@@ -820,35 +756,10 @@ weights derived by lengths. i.e 1/pow(length, power)
     .Input(0, "lengths", "1-D int32_t or int64_t tensor of lengths")
     .Output(0, "a vector of weights", "1-D float tensor of weights by length");
 
-
-
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(WallClockTime);
 
-OPERATOR_SCHEMA(UnsafeCoalesce)
-    .NumInputsOutputs([](int inputs, int outputs) {
-      return inputs + 1 == outputs;
-    })
-    .AllowInplace([](int input, int output) { return input == output; })
-    .SetDoc(R"DOC(
-Coalesce the N inputs into N outputs and a single coalesced output blob.
-
-This allows operations that operate over multiple small kernels (e.g.
-biases in a deep CNN) to be coalesced into a single larger operation,
-amortizing the kernel launch overhead, synchronization costs for
-distributed computation, etc.
-
-The operator:
-
-- computes the total size of the coalesced blob by summing the input sizes
-- allocates the coalesced output blob as the total size
-- copies the input vectors into the coalesced blob, at the correct offset.
-- aliases each Output(i) to- point into the coalesced blob, at the corresponding offset for Input(i).
-
-This is 'unsafe' as the output vectors are aliased, so use with
-caution.
-
-)DOC");
-
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(EnsureDense)
     .NumInputs(1)
     .NumOutputs(1)
@@ -867,6 +778,7 @@ The operator's behaviors:
     .Input(0, "input", "Input tensors.")
     .Output(0, "output", "Output tensor. Same dimension as inputs.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(AccumulateHistogram)
     .NumInputs(1)
     .NumOutputs(2)
@@ -908,13 +820,17 @@ class GetEnsureDenseGradient : public GradientMakerBase {
     }
   }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(EnsureDense, GetEnsureDenseGradient);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(Print);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(HasElements);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(IsEmpty);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(LengthsToShape);
-SHOULD_NOT_DO_GRADIENT(UnsafeCoalesce);
 
 class GetAliasGradient : public GradientMakerBase {
   using GradientMakerBase::GradientMakerBase;
@@ -925,8 +841,10 @@ class GetAliasGradient : public GradientMakerBase {
     return vector<OperatorDef>();
   }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(Alias, GetAliasGradient);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(ResizeLike);
 
 class GetSumGradient : public GradientMakerBase {
@@ -938,15 +856,21 @@ class GetSumGradient : public GradientMakerBase {
     return vector<OperatorDef>();
   }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(Sum, GetSumGradient);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(ScatterWeightedSum);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(ScatterAssign);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+SHOULD_NOT_DO_GRADIENT(Scatter);
 
 class GetWeightedSumGradient : public GradientMakerBase {
   using GradientMakerBase::GradientMakerBase;
   vector<OperatorDef> GetGradientDefs() override {
     ArgumentHelper argsHelper(def_);
+    // NOLINTNEXTLINE(modernize-use-bool-literals)
     const bool grad_on_w = argsHelper.GetSingleArgument<bool>("grad_on_w", 0);
 
     auto inputs = vector<string>{GO(0)};
@@ -966,6 +890,7 @@ class GetWeightedSumGradient : public GradientMakerBase {
     return SingleGradientDef("WeightedSumGradient", "", inputs, outputs);
   }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(WeightedSum, GetWeightedSumGradient);
 
 struct GetFlattenToVecGradient : public GradientMakerBase {
@@ -975,77 +900,29 @@ struct GetFlattenToVecGradient : public GradientMakerBase {
         "ResizeLike", "", vector<string>{GO(0), I(0)}, vector<string>{GI(0)});
   }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(FlattenToVec, GetFlattenToVecGradient);
 
-struct GetCopyGradient : public GradientMakerBase {
-  using GradientMakerBase::GradientMakerBase;
-  vector<OperatorDef> GetGradientDefs() override {
-    return SingleGradientDef(
-        "CopyOnDeviceLike",
-        "",
-        vector<string>{GO(0), I(0)},
-        vector<string>{GI(0)});
-  }
-};
-REGISTER_GRADIENT(Copy, GetCopyGradient);
-
-struct GetGPUToCPUGradient : public GradientMakerBase {
-  using GradientMakerBase::GradientMakerBase;
-  vector<OperatorDef> GetGradientDefs() override {
-    if (g_output_[0].IsDense()) {
-      return SingleGradientDef(
-          "CopyCPUToGPU", "", vector<string>{GO(0)}, vector<string>{GI(0)});
-    } else {
-      return vector<OperatorDef>{CreateOperatorDef(
-                                     "CopyCPUToGPU",
-                                     "",
-                                     std::vector<string>{GO_I(0)},
-                                     std::vector<string>{GI_I(0)}),
-                                 CreateOperatorDef(
-                                     "CopyCPUToGPU",
-                                     "",
-                                     std::vector<string>{GO_V(0)},
-                                     std::vector<string>{GI_V(0)})};
-    }
-  }
-};
-REGISTER_GRADIENT(CopyGPUToCPU, GetGPUToCPUGradient);
-
-struct GetCPUToGPUGradient : public GradientMakerBase {
-  using GradientMakerBase::GradientMakerBase;
-  vector<OperatorDef> GetGradientDefs() override {
-    if (g_output_[0].IsDense()) {
-      return SingleGradientDef(
-          "CopyGPUToCPU", "", vector<string>{GO(0)}, vector<string>{GI(0)});
-    } else {
-      return vector<OperatorDef>{CreateOperatorDef(
-                                     "CopyGPUToCPU",
-                                     "",
-                                     std::vector<string>{GO_I(0)},
-                                     std::vector<string>{GI_I(0)}),
-                                 CreateOperatorDef(
-                                     "CopyGPUToCPU",
-                                     "",
-                                     std::vector<string>{GO_V(0)},
-                                     std::vector<string>{GI_V(0)})};
-    }
-  }
-};
-REGISTER_GRADIENT(CopyCPUToGPU, GetCPUToGPUGradient);
-
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(LengthsToSegmentIds);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(SegmentIdsToLengths);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(SegmentIdsToRanges);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(SegmentIdsToLengthWeights);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(GatherRangesOp);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(LengthsGather);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(AccumulateHistogram);
 
 template <>
 bool NanCheckOp<CPUContext>::RunOnDevice() {
   auto& X = Input(0);
   auto* Y = Output(0);
-  const int D = X.size();
+  const int D = X.numel();
   const float* data = X.data<float>();
   ConstEigenVectorMap<float> input_data(data, D);
 
@@ -1061,7 +938,8 @@ bool NanCheckOp<CPUContext>::RunOnDevice() {
       tensorPrinter_.Print<float>(Input(j));
       std::cerr << "NaN idxs:" << std::endl;
       const float* x = Input(j).data<float>();
-      for (size_t i = 0; i < Input(j).size(); ++i) {
+      // NOLINTNEXTLINE(clang-diagnostic-sign-compare)
+      for (size_t i = 0; i < Input(j).numel(); ++i) {
         if (std::isnan(x[i]) || std::isinf(x[i])) {
           std::cerr << i << " ";
         }
@@ -1072,13 +950,16 @@ bool NanCheckOp<CPUContext>::RunOnDevice() {
   }
 
   if (&X != Y) {
-    Y->CopyFrom(X, &context_);
+    Y->CopyFrom(X);
   }
   return true;
 }
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(NanCheck, NanCheckOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(NanCheck, GetNanCheckGradient);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(NanCheck)
     .NumInputs(1, INT_MAX)
     .NumOutputs(1)
@@ -1092,6 +973,22 @@ OPERATOR_SCHEMA(NanCheck)
         "Tensor to copy input into if no NaNs or inf."
         " Can be in-place");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+REGISTER_CPU_OPERATOR(IsNaN, IsNanOp<CPUContext>);
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+OPERATOR_SCHEMA(IsNaN)
+    .NumInputs(1)
+    .NumOutputs(1)
+    .SetDoc(
+        "Returns a new tensor with boolean elements representing if each element is NaN or not.")
+    .Input(0, "tensor", "Tensor to check for nan")
+    .Output(
+        0,
+        "output",
+        "Tensor containing a 1 at each location of NaN elements.");
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Size)
     .NumInputs(1)
     .NumOutputs(1)
@@ -1154,14 +1051,19 @@ size: 24
 </details>
 
       )DOC")
-    .Input(0, "X", "*(type: Tensor)* Input tensor to calculate number of elements.")
+    .Input(
+        0,
+        "X",
+        "*(type: Tensor)* Input tensor to calculate number of elements.")
     .Output(
         0,
         "size",
         "*(type: Tensor)* 1D tensor of type int64 that contains the number of "
         "elements in the input tensor *X*.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(Size, SizeOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 NO_GRADIENT(Size);
 
 template <>
@@ -1171,12 +1073,13 @@ bool RangeOp<CPUContext>::DoRunOnDevice(
     const T& step,
     Tensor* output) {
   auto* output_data = output->template mutable_data<T>();
-  for (int i = 0; i < output->size(); ++i) {
+  for (int i = 0; i < output->numel(); ++i) {
     output_data[i] = i * step + start;
   }
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Range)
     .NumInputs(1, 3)
     .NumOutputs(1)
@@ -1234,31 +1137,61 @@ output: [ 4  6  8 10 12 14 16]
     .Input(
         0,
         "start",
-        "(*Tensor*): [OPTIONAL] scalar tensor containing the start of the interval (inclusive) (default=0)")
-    .Input(1, "stop", "(*Tensor*): scalar tensor containing the end of the interval (exclusive)")
-    .Input(2, "step", "(*Tensor*): [OPTIONAL] scalar tensor specifying the spacing between values (default=1)")
+        "(*Tensor*): [OPTIONAL] scalar or 1-element tensor containing the start of the interval (inclusive) (default=0)")
+    .Input(
+        1,
+        "stop",
+        "(*Tensor*): scalar or 1-element tensor containing the end of the interval (exclusive)")
+    .Input(
+        2,
+        "step",
+        "(*Tensor*): [OPTIONAL] scalar or 1-element tensor specifying the spacing between values (default=1)")
     .Output(
         0,
         "output",
         "(*Tensor*): 1D tensor of same type as inputs that contains the sequence");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(Range, RangeOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 NO_GRADIENT(Range);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(ThrowException, ThrowExceptionOp);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(ThrowException).NumInputs(0).NumOutputs(0);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(ThrowException);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(ThrowChildThreadException, ThrowChildThreadExceptionOp);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(ThrowChildThreadException).NumInputs(0).NumOutputs(0);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(ThrowChildThreadException);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(LogFatal, LogFatalOp);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(LogFatal).NumInputs(0).NumOutputs(0);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(LogFatal);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(Fail, FailOp);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Fail).NumInputs(0).NumOutputs(0);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 SHOULD_NOT_DO_GRADIENT(Fail);
 
 } // namespace caffe2
+
+C10_EXPORT_CAFFE2_OP_TO_C10_CPU(
+    GatherRanges,
+    "_caffe2::GatherRanges(Tensor data, Tensor ranges) -> (Tensor, Tensor)",
+    caffe2::GatherRangesOp<caffe2::CPUContext>)
+
+C10_EXPORT_CAFFE2_OP_TO_C10_CPU(
+    LengthsGather,
+    "_caffe2::LengthsGather(Tensor data, Tensor lengths, Tensor indices) -> (Tensor)",
+    caffe2::LengthsGatherOp<caffe2::CPUContext>)

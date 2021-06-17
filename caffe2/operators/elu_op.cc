@@ -28,6 +28,7 @@ bool EluGradientFunctor<CPUContext>::Forward(
     T* dX,
     CPUContext* /* context */) const {
   const int size = std::accumulate(
+      // NOLINTNEXTLINE(modernize-use-transparent-functors)
       Y_dims.cbegin(), Y_dims.cend(), 1, std::multiplies<int>());
   ConstEigenVectorArrayMap<T> Y_arr(Y, size);
   ConstEigenVectorArrayMap<T> dY_arr(dY, size);
@@ -36,13 +37,15 @@ bool EluGradientFunctor<CPUContext>::Forward(
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     Elu,
     UnaryElementwiseWithArgsOp<
         TensorTypes<float>,
         CPUContext,
         EluFunctor<CPUContext>>);
-REGISTER_CPU_OPERATOR(
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+REGISTER_CPU_GRADIENT_OPERATOR(
     EluGradient,
     BinaryElementwiseWithArgsOp<
         TensorTypes<float>,
@@ -50,6 +53,7 @@ REGISTER_CPU_OPERATOR(
         EluGradientFunctor<CPUContext>>);
 
 // Input: X, output: Y
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Elu)
     .NumInputs(1)
     .NumOutputs(1)
@@ -113,10 +117,11 @@ Y:
     .Arg(
         "alpha",
         "*(type: float; default: 1.0)* Defines alpha parameter used in calculation.")
-    .InheritOnnxSchema("Elu");
+    .InheritOnnxSchema();
 
 // Input: Y, dY, output: dX
-OPERATOR_SCHEMA(EluGradient)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+GRADIENT_OPERATOR_SCHEMA(EluGradient)
     .NumInputs(2)
     .NumOutputs(1)
     .AllowInplace({{1, 0}})
@@ -140,6 +145,7 @@ class GetEluGradient : public GradientMakerBase {
 
 } // namespace
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(Elu, GetEluGradient);
 
 } // namespace caffe2

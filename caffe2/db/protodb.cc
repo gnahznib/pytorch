@@ -11,7 +11,8 @@ class ProtoDBCursor : public Cursor {
  public:
   explicit ProtoDBCursor(const TensorProtos* proto)
     : proto_(proto), iter_(0) {}
-  ~ProtoDBCursor() {}
+  // NOLINTNEXTLINE(modernize-use-equals-default)
+  ~ProtoDBCursor() override {}
 
   void Seek(const string& /*str*/) override {
     CAFFE_THROW("ProtoDB is not designed to support seeking.");
@@ -20,7 +21,10 @@ class ProtoDBCursor : public Cursor {
   void SeekToFirst() override { iter_ = 0; }
   void Next() override { ++iter_; }
   string key() override { return proto_->protos(iter_).name(); }
-  string value() override { return proto_->protos(iter_).SerializeAsString(); }
+  string value() override {
+    return
+      SerializeAsString_EnforceCheck(proto_->protos(iter_), "ProtoDBCursor");
+  }
   bool Valid() override { return iter_ < proto_->protos_size(); }
 
  private:
@@ -36,7 +40,10 @@ class ProtoDBTransaction : public Transaction {
       existing_names_.insert(tensor.name());
     }
   }
-  ~ProtoDBTransaction() { Commit(); }
+  ~ProtoDBTransaction() override {
+    // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
+    Commit();
+  }
   void Put(const string& key, const string& value) override {
     if (existing_names_.count(key)) {
       CAFFE_THROW("An item with key ", key, " already exists.");
@@ -60,7 +67,7 @@ class ProtoDBTransaction : public Transaction {
   TensorProtos* proto_;
   std::unordered_set<string> existing_names_;
 
-  AT_DISABLE_COPY_AND_ASSIGN(ProtoDBTransaction);
+  C10_DISABLE_COPY_AND_ASSIGN(ProtoDBTransaction);
 };
 
 class ProtoDB : public DB {
@@ -74,7 +81,10 @@ class ProtoDB : public DB {
     }
     LOG(INFO) << "Opened protodb " << source;
   }
-  ~ProtoDB() { Close(); }
+  ~ProtoDB() override {
+    // NOLINTNEXTLINE(clang-analyzer-optin.cplusplus.VirtualCall)
+    Close();
+  }
 
   void Close() override {
     if (mode_ == NEW || mode_ == WRITE) {
@@ -94,8 +104,10 @@ class ProtoDB : public DB {
   string source_;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CAFFE2_DB(ProtoDB, ProtoDB);
 // For lazy-minded, one can also call with lower-case name.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CAFFE2_DB(protodb, ProtoDB);
 
 }  // namespace db

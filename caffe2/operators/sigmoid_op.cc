@@ -13,6 +13,7 @@ operator()(const int N, const T* X, T* Y, CPUContext* /* context */) const {
   return true;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     Sigmoid,
     UnaryElementwiseOp<
@@ -21,6 +22,7 @@ REGISTER_CPU_OPERATOR(
         SigmoidFunctor<CPUContext>>);
 
 // Input: X, output: Y
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(Sigmoid)
     .NumInputs(1)
     .NumOutputs(1)
@@ -76,12 +78,14 @@ sigmoid: [0.8284105  0.57842743 0.85621804 0.80923885 0.10222916]
 )DOC")
     .Input(0, "X", "*(type: Tensor`<float>`)* Input tensor.")
     .Output(0, "Y", "*(type: Tensor`<float>`)* Output tensor.")
-    .InheritOnnxSchema("Sigmoid");
+    .InheritOnnxSchema();
 // Input: Y, dY, output: dX
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(SigmoidGradient)
     .NumInputs(2)
     .NumOutputs(1)
     .AllowInplace({{1, 0}})
+    .IdenticalTypeAndShapeOfInput(1)
     .SetDoc(R"DOC(
 SigmoidGradient takes both Y and dY and uses this to update dX according to the
 chain rule and derivatives of the sigmoid function.

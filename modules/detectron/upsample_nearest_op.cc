@@ -15,14 +15,27 @@
  */
 
 #include "upsample_nearest_op.h"
+#ifdef CAFFE2_USE_MKLDNN
+#include "caffe2/ideep/operators/operator_fallback_ideep.h"
+#include "caffe2/ideep/utils/ideep_operator.h"
+#endif
 
 namespace caffe2 {
+#ifdef CAFFE2_USE_MKLDNN
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+REGISTER_IDEEP_OPERATOR(
+    UpsampleNearest,
+    IDEEPFallbackOp<UpsampleNearestOp<float, CPUContext>>);
+#endif
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(UpsampleNearest, UpsampleNearestOp<float, CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(
     UpsampleNearestGradient,
     UpsampleNearestGradientOp<float, CPUContext>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(UpsampleNearest)
     .NumInputs(1)
     .NumOutputs(1)
@@ -42,6 +55,7 @@ Nearest neighbor upsampling operation. Implementation taken from THCUNN.
         "4D feature map of shape (N, C, scale * H, scale * W); Values are "
         "neareast neighbor samples from X.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(UpsampleNearestGradient)
     .NumInputs(2)
     .NumOutputs(1)
@@ -69,6 +83,7 @@ class GetUpsampleNearestGradient : public GradientMakerBase {
   }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(UpsampleNearest, GetUpsampleNearestGradient);
 
 } // namespace caffe2

@@ -3,7 +3,10 @@ import torch._C
 import contextlib
 import ctypes
 import sys
+import types
 
+import torch.jit
+import torch._utils_internal
 
 # Query `hasattr` only once.
 _SET_GLOBAL_FLAGS = hasattr(sys, 'getdlopenflags') and hasattr(sys, 'setdlopenflags')
@@ -23,7 +26,10 @@ def dl_open_guard():
         sys.setdlopenflags(old_flags)
 
 
-class _OpNamespace(object):
+# _OpNamespace is a subclass of ModuleType because the torch script
+# allows attribute lookups on modules only. Since we want torch.ops.foo.bar()
+# to work from script, we need to ensure ops and foo are modules
+class _OpNamespace(types.ModuleType):
     """
     An op namespace to dynamically bind Operators into Python.
 
@@ -44,18 +50,26 @@ class _OpNamespace(object):
         operation will already exist).
     """
     def __init__(self, name):
+        super(_OpNamespace, self).__init__('torch.ops.' + name)
         self.name = name
 
     def __getattr__(self, op_name):
         # Get the op `my_namespace::my_op` if available. This will also check
         # for overloads and raise an exception if there are more than one.
-        op = torch._C._jit_get_operation('{}::{}'.format(self.name, op_name))
+        qualified_op_name = '{}::{}'.format(self.name, op_name)
+        op = torch._C._jit_get_operation(qualified_op_name)
+        # let the script frontend know that op is identical to the builtin op
+        # with qualified_op_name
+        torch.jit._builtins._register_builtin(op, qualified_op_name)
         setattr(self, op_name, op)
+        op.__module__ = self.__module__ + "." + self.name
         return op
 
+class _Ops(types.ModuleType):
+    __file__ = '_ops.py'
 
-class _Ops(object):
     def __init__(self):
+        super(_Ops, self).__init__('torch.ops')
         self.loaded_libraries = set()
 
     def __getattr__(self, name):
@@ -79,16 +93,19 @@ class _Ops(object):
         ``torch.ops.loaded_libraries`` attribute, a set that may be inspected
         for the paths of all libraries loaded using this function.
 
-        Arguments:
+        Args:
             path (str): A path to a shared library to load.
         """
+        if sys.executable == "torch_deploy":
+            return
+
+        path = torch._utils_internal.resolve_library_path(path)
         with dl_open_guard():
             # Import the shared library into the process, thus running its
             # static (global) initialization code in order to register custom
             # operators with the JIT.
             ctypes.CDLL(path)
         self.loaded_libraries.add(path)
-
 
 # The ops "namespace"
 ops = _Ops()

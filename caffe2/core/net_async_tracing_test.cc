@@ -25,6 +25,7 @@ void testExtractShardId(const string& name, int expectedId) {
   EXPECT_EQ(extractShardId(name), expectedId);
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 TEST(NetAsyncTracingTest, ExtractShardId) {
   testExtractShardId("ABCDEFshard:1705!!A", 1705);
   // Should use the last one
@@ -35,6 +36,80 @@ TEST(NetAsyncTracingTest, ExtractShardId) {
   testExtractShardId("FC:shard:0", 0);
   testExtractShardId("FC:shard:10", 10);
   testExtractShardId("FC:shard:15", 15);
+}
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+TEST(NetAsyncTracingTest, EveryKIteration) {
+  const auto spec = R"DOC(
+      name: "example"
+      type: "async_scheduling"
+      arg {
+        name: "enable_tracing"
+        i: 1
+      }
+      arg {
+        name: "tracing_mode"
+        s: "EVERY_K_ITERATIONS"
+      }
+      arg {
+        name: "tracing_filepath"
+        s: "/tmp"
+      }
+      arg {
+        name: "trace_every_nth_batch"
+        i: 1
+      }
+      arg {
+        name: "dump_every_nth_batch"
+        i: 1
+      }
+      op {
+        output: "out"
+        type: "UniformFill"
+      }
+)DOC";
+
+  NetDef net_def;
+  CAFFE_ENFORCE(TextFormat::ParseFromString(spec, &net_def));
+
+  Workspace ws;
+  std::unique_ptr<NetBase> net(CreateNet(net_def, &ws));
+  net->Run();
+}
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+TEST(NetAsyncTracingTest, GlobalTimeSlice) {
+  const auto spec = R"DOC(
+      name: "example"
+      type: "async_scheduling"
+      arg {
+        name: "enable_tracing"
+        i: 1
+      }
+      arg {
+        name: "tracing_filepath"
+        s: "/tmp"
+      }
+      arg {
+        name: "trace_for_n_ms"
+        i: 1
+      }
+      arg {
+        name: "trace_every_n_ms"
+        i: 1
+      }
+      op {
+        output: "out"
+        type: "UniformFill"
+      }
+)DOC";
+
+  NetDef net_def;
+  CAFFE_ENFORCE(TextFormat::ParseFromString(spec, &net_def));
+
+  Workspace ws;
+  std::unique_ptr<NetBase> net(CreateNet(net_def, &ws));
+  net->Run();
 }
 
 } // namespace tracing

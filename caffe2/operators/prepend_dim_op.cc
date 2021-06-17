@@ -2,9 +2,12 @@
 
 namespace caffe2 {
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(PrependDim, PrependDimOp<CPUContext>);
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_CPU_OPERATOR(MergeDim, MergeDimOp<CPUContext>);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(PrependDim)
     .NumInputs(1)
     .NumOutputs(1)
@@ -17,6 +20,7 @@ size of the next dimension by that amount.
     .Input(0, "data", "An input tensor.")
     .Output(0, "reshaped", "Reshaped tensor.");
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 OPERATOR_SCHEMA(MergeDim)
     .NumInputs(1)
     .NumOutputs(1)
@@ -25,7 +29,8 @@ OPERATOR_SCHEMA(MergeDim)
 Merge first two dimensions in a single dimension with size dim(0) * dim(1).
 )DOC")
     .Input(0, "data", "An input tensor.")
-    .Output(0, "reshaped", "Reshaped tensor.");
+    .Output(0, "reshaped", "Reshaped tensor.")
+    .InheritOnnxSchema("Reshape");
 
 class GetPrependDimGradient : public GradientMakerBase {
   using GradientMakerBase::GradientMakerBase;
@@ -40,6 +45,7 @@ class GetPrependDimGradient : public GradientMakerBase {
   }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 REGISTER_GRADIENT(PrependDim, GetPrependDimGradient);
 
 } // namespace caffe2

@@ -3,16 +3,19 @@
 #include <string>
 #include <functional>
 
+#include "c10/util/Registry.h"
 #include "caffe2/core/common.h"
-#include "caffe2/core/registry.h"
-#include "caffe2/proto/caffe2.pb.h"
+#include "caffe2/proto/caffe2_pb.h"
 
 namespace caffe2 {
 
 class Blob;
 
-constexpr int kDefaultChunkSize = -1;
-constexpr int kNoChunking = 0;
+// Constants for use in the BlobSerializationOptions chunk_size field.
+// These should ideally be defined in caffe2.proto so they can be exposed across
+// languages, but protobuf does not appear to allow defining constants.
+constexpr int kDefaultChunkSize = 0;
+constexpr int kNoChunking = -1;
 
 /**
  * @brief BlobSerializerBase is an abstract class that serializes a blob to a
@@ -43,27 +46,31 @@ class BlobSerializerBase {
    *     serailizer can use it to save blob in several chunks
    *     acceptor should be thread-safe
    */
-  virtual void Serialize(const Blob& blob, const std::string& name,
-                        SerializationAcceptor acceptor) = 0;
+  virtual void Serialize(
+      const void* pointer,
+      TypeMeta typeMeta,
+      const std::string& name,
+      SerializationAcceptor acceptor) = 0;
 
-  virtual void SerializeWithChunkSize(
-      const Blob& blob,
+  virtual void SerializeWithOptions(
+      const void* pointer,
+      TypeMeta typeMeta,
       const std::string& name,
       SerializationAcceptor acceptor,
-      int /*chunk_size*/) {
+      const BlobSerializationOptions& /*options*/) {
     // Base implementation.
-    Serialize(blob, name, acceptor);
+    Serialize(pointer, typeMeta, name, acceptor);
   }
 };
 
 // The Blob serialization registry and serializer creator functions.
-CAFFE_DECLARE_TYPED_REGISTRY(
+C10_DECLARE_TYPED_REGISTRY(
     BlobSerializerRegistry,
     TypeIdentifier,
     BlobSerializerBase,
     std::unique_ptr);
 #define REGISTER_BLOB_SERIALIZER(id, ...) \
-  CAFFE_REGISTER_TYPED_CLASS(BlobSerializerRegistry, id, __VA_ARGS__)
+  C10_REGISTER_TYPED_CLASS(BlobSerializerRegistry, id, __VA_ARGS__)
 // Creates an operator with the given operator definition.
 inline unique_ptr<BlobSerializerBase> CreateSerializer(TypeIdentifier id) {
   return BlobSerializerRegistry()->Create(id);
@@ -74,7 +81,7 @@ inline unique_ptr<BlobSerializerBase> CreateSerializer(TypeIdentifier id) {
  * @brief BlobDeserializerBase is an abstract class that deserializes a blob
  * from a BlobProto or a TensorProto.
  */
-class CAFFE2_API BlobDeserializerBase {
+class TORCH_API BlobDeserializerBase {
  public:
   virtual ~BlobDeserializerBase() {}
 
@@ -82,9 +89,9 @@ class CAFFE2_API BlobDeserializerBase {
   virtual void Deserialize(const BlobProto& proto, Blob* blob) = 0;
 };
 
-CAFFE_DECLARE_REGISTRY(BlobDeserializerRegistry, BlobDeserializerBase);
+C10_DECLARE_REGISTRY(BlobDeserializerRegistry, BlobDeserializerBase);
 #define REGISTER_BLOB_DESERIALIZER(name, ...) \
-  CAFFE_REGISTER_CLASS(BlobDeserializerRegistry, name, __VA_ARGS__)
+  C10_REGISTER_CLASS(BlobDeserializerRegistry, name, __VA_ARGS__)
 // Creates an operator with the given operator definition.
 inline unique_ptr<BlobDeserializerBase> CreateDeserializer(const string& type) {
   return BlobDeserializerRegistry()->Create(type);

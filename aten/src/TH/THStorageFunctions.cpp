@@ -1,26 +1,63 @@
 #include <climits>
-#include <ATen/core/intrusive_ptr.h>
+#include <c10/util/intrusive_ptr.h>
 
-#include "THStorageFunctions.hpp"
+#include <TH/THStorageFunctions.hpp>
 
-#include "generic/THStorage.cpp"
-#include "THGenerateAllTypes.h"
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorage.cpp>
+#include <TH/THGenerateAllTypes.h>
 
-#include "generic/THStorage.cpp"
-#include "THGenerateHalfType.h"
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorage.cpp>
+#include <TH/THGenerateComplexTypes.h>
 
-#include "generic/THStorageCopy.cpp"
-#include "THGenerateAllTypes.h"
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorage.cpp>
+#include <TH/THGenerateHalfType.h>
 
-#include "generic/THStorageCopy.cpp"
-#include "THGenerateHalfType.h"
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorage.cpp>
+#include <TH/THGenerateBoolType.h>
 
-THStorage* THStorage_new(at::ScalarType scalar_type) {
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorage.cpp>
+#include <TH/THGenerateQTypes.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorage.cpp>
+#include <TH/THGenerateBFloat16Type.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorageCopy.cpp>
+#include <TH/THGenerateAllTypes.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorageCopy.cpp>
+#include <TH/THGenerateComplexTypes.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorageCopy.cpp>
+#include <TH/THGenerateHalfType.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorageCopy.cpp>
+#include <TH/THGenerateBoolType.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorageCopy.cpp>
+#include <TH/THGenerateQTypes.h>
+
+// NOLINTNEXTLINE(bugprone-suspicious-include)
+#include <TH/generic/THStorageCopy.cpp>
+#include <TH/THGenerateBFloat16Type.h>
+
+THStorage* THStorage_new() {
   THStorage* storage = c10::make_intrusive<at::StorageImpl>(
-      scalar_type,
-      0,
-      getTHDefaultAllocator(),
-      true).release();
+                           c10::StorageImpl::use_byte_size_t(),
+                           0,
+                           getTHDefaultAllocator(),
+                           true)
+                           .release();
   return storage;
 }
 
@@ -29,41 +66,34 @@ void THStorage_free(THStorage* storage) {
   if (!storage) {
     return;
   }
-  storage->_raw_decref();
-}
-
-ptrdiff_t THStorage_size(const THStorage *self)
-{
-  return self->size();
+  c10::raw::intrusive_ptr::decref(storage);
 }
 
 void THStorage_retain(THStorage *storage)
 {
   if (storage) {
-    storage->_raw_incref();
+    c10::raw::intrusive_ptr::incref(storage);
   }
 }
 
-void THStorage_resize(THStorage* storage, ptrdiff_t size) {
+void THStorage_resizeBytes(THStorage* storage, ptrdiff_t size_bytes) {
   if (storage->resizable()) {
     /* case when the allocator does not have a realloc defined */
     at::DataPtr new_data;
-    if (size != 0) {
-      new_data = storage->allocator()->allocate(storage->elementSize() * size);
+    if (size_bytes != 0) {
+      new_data = storage->allocator()->allocate(size_bytes);
     }
     at::DataPtr old_data = storage->set_data_ptr(std::move(new_data));
-    ptrdiff_t old_size = storage->size();
-    storage->set_size(size);
+    ptrdiff_t old_capacity = storage->nbytes();
+    storage->set_nbytes(size_bytes);
     if (old_data != nullptr) {
-      ptrdiff_t copy_size = old_size;
-      if (storage->size() < copy_size) {
-        copy_size = storage->size();
+      ptrdiff_t copy_capacity = old_capacity;
+      // NOLINTNEXTLINE(clang-diagnostic-sign-compare)
+      if (storage->nbytes() < copy_capacity) {
+        copy_capacity = storage->nbytes();
       }
-      if (copy_size > 0) {
-        memcpy(
-            storage->data(),
-            old_data.get(),
-            storage->elementSize() * copy_size);
+      if (copy_capacity > 0) {
+        memcpy(storage->data(), old_data.get(), copy_capacity);
       }
     }
   } else {
